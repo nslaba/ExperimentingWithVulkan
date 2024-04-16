@@ -26,8 +26,16 @@ public:
 	}
 	
 private:
+	/* Member vars */
 	GLFWwindow* window;
+	vk::Instance instance;
+	vk::InstanceCreateInfo createInfo{};
+	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
+
+	/* Member functions */
 	void initWindow() {
+		
 		glfwInit();
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -38,9 +46,10 @@ private:
 
 	void initVulkan() {
 		createInstance();
+
+		pickPhysicalDevice();
 	}
-	vk::Instance instance;
-	vk::InstanceCreateInfo createInfo{};
+	
 	void createInstance() {
 		vk::ApplicationInfo appInfo{};
 		appInfo.sType = vk::StructureType::eApplicationInfo;
@@ -69,6 +78,41 @@ private:
 		if (vk::createInstance(&createInfo, nullptr, &instance) != vk::Result::eSuccess) {
 			throw std::runtime_error("failed to create instance!");
 		}
+	}
+
+	void pickPhysicalDevice() {
+		uint32_t deviceCount = 0;
+		auto devices = instance.enumeratePhysicalDevices();
+		if (!devices.empty()) {
+			physicalDevice = devices[0];
+		}
+		else {
+			throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		}
+
+		// If successfully found, then allocate an array to hold all of the vk physical device handles
+		for (const auto& device : devices) {
+			if (isDeviceSuitable(device)) {
+				physicalDevice = device;
+				break;
+			}
+		}
+
+		if (physicalDevice == VK_NULL_HANDLE) {
+			throw std::runtime_error("failed to find a suitable GPU!");
+		}
+
+	}
+
+	// Helper func
+	bool isDeviceSuitable(vk::PhysicalDevice device) {
+		vk::PhysicalDeviceProperties deviceProperties;
+		deviceProperties = device.getProperties();
+
+		vk::PhysicalDeviceFeatures deviceFeatures;
+		deviceFeatures = device.getFeatures();
+
+		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader;
 	}
 
 	
