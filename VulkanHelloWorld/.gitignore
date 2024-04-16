@@ -1,0 +1,14 @@
+# Exclude Visual Studio temporary files and build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Dd]ebug*/
+[Rr]elease*/
+x64/
+x86/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+Libraries/
