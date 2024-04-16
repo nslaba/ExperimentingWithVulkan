@@ -39,7 +39,7 @@ private:
 		createInstance();
 	}
 	vk::Instance instance;
-
+	vk::InstanceCreateInfo createInfo{};
 	void createInstance() {
 		vk::ApplicationInfo appInfo{};
 		appInfo.sType = vk::StructureType::eApplicationInfo;
@@ -48,15 +48,12 @@ private:
 		appInfo.pEngineName = "No Engine";
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.apiVersion = VK_API_VERSION_1_0;
+
+		createInfo.sType = vk::StructureType::eInstanceCreateInfo;
+		createInfo.pApplicationInfo = &appInfo;
 	}
 
-	// Not sure if this should be global??
 	
-	vk::InstanceCreateInfo createInfo{};
-	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-	createInfo.pApplicationInfo = &appInfo;
-	//////
-
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
