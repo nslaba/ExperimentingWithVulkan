@@ -51,6 +51,18 @@ private:
 
 		createInfo.sType = vk::StructureType::eInstanceCreateInfo;
 		createInfo.pApplicationInfo = &appInfo;
+
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		createInfo.enabledExtensionCount = glfwExtensionCount;
+		createInfo.ppEnabledExtensionNames = glfwExtensions;
+
+		createInfo.enabledLayerCount = 0;
+
+		vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
 	}
 
 	
