@@ -1,6 +1,5 @@
 #define GLFW_INCLUDE_VULKAN
 #include "glfw3.h"
-
 #include <vulkan/vulkan.hpp>
 
 #define GLM_FORCE_RADIANS
@@ -10,14 +9,79 @@
 
 #include <iostream>
 #include <stdexcept>
-#include <cstdlib>
+#include <cstdlib> // provides exit success and exit failure macros
+
+const uint32_t WIDTH = 800;
+const uint32_t HEIGHT = 600;
+
+class HelloTriangleApplication {
+
+public:
+	GLFWwindow* window;
+	void run() {
+		initWindow();
+		initVulkan();
+		mainLoop();
+		cleanup();
+	}
+	
+private:
+	void initWindow() {
+		glfwInit();
+
+		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
+	}
+
+
+	void initVulkan() {
+		createInstance();
+	}
+	vk::Instance instance;
+
+	void createInstance() {
+		vk::ApplicationInfo appInfo{};
+		appInfo.sType = vk::StructureType::eApplicationInfo;
+		appInfo.pApplicationName = "Hello Triangle";
+		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.pEngineName = "No Engine";
+		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+		appInfo.apiVersion = VK_API_VERSION_1_0;
+	}
+
+	// Not sure if this should be global??
+	
+	vk::InstanceCreateInfo createInfo{};
+	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+	createInfo.pApplicationInfo = &appInfo;
+	//////
+
+	void mainLoop() {
+		while (!glfwWindowShouldClose(window)) {
+			glfwPollEvents();
+		}
+	}
+
+	void cleanup() {
+		glfwDestroyWindow(window);
+
+		glfwTerminate();
+	}
+};
 
 int main() {
-	glfwInit();
+	HelloTriangleApplication app;
 
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	try {
+		app.run();
+	} catch (const std::exception& e) {
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
+	
+	return EXIT_SUCCESS;
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "Vulkan window", nullptr, nullptr);
 
 	uint32_t extensionCount = 0;
 	vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -28,14 +92,6 @@ int main() {
 	glm::vec4 vec;
 
 	auto test = matrix * vec;
-
-	while (!glfwWindowShouldClose(window)) {
-		glfwPollEvents();
-	}
-
-	glfwDestroyWindow(window);
-
-	glfwTerminate();
 
 	return 0;
 }
