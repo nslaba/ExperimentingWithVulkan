@@ -17,7 +17,7 @@ const uint32_t HEIGHT = 600;
 class HelloTriangleApplication {
 
 public:
-	GLFWwindow* window;
+	
 	void run() {
 		initWindow();
 		initVulkan();
@@ -26,6 +26,7 @@ public:
 	}
 	
 private:
+	GLFWwindow* window;
 	void initWindow() {
 		glfwInit();
 
@@ -62,7 +63,12 @@ private:
 
 		createInfo.enabledLayerCount = 0;
 
-		vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
+		//vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
+
+		// check if successful
+		if (vk::createInstance(&createInfo, nullptr, &instance) != vk::Result::eSuccess) {
+			throw std::runtime_error("failed to create instance!");
+		}
 	}
 
 	
@@ -73,6 +79,8 @@ private:
 	}
 
 	void cleanup() {
+		instance.destroy();
+		
 		glfwDestroyWindow(window);
 
 		glfwTerminate();
