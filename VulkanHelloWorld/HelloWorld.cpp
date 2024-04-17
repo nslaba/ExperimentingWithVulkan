@@ -63,7 +63,7 @@ private:
 	// physical dvice
 	struct QueueFamilyIndeces {
 		std::optional<uint32_t> graphicsFamily; // std optional is a wrapper that contains no value until ou assign something to it.
-		
+		std::optional<uint32_t> presentFamily;
 		// generic check inline
 		bool isComplete() {
 			return graphicsFamily.has_value();
@@ -203,11 +203,21 @@ private:
 		uint32_t queueFamilyCount = 0;
 		std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
+		vk::Bool32 presentSupport = false; 
+
 		int i = 0;
 		for (const auto& queueFamily : queueFamilies) {
+			presentSupport = device.getSurfaceSupportKHR(i, surface);
+			// CHECK THIS IT COULD BE WRONG -- MY BRAIN ISN't WORKING ANYMORE. TBC
 			if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
 			{
-				indices.graphicsFamily = i;
+				if (presentSupport)
+				{
+					indices.presentFamily = i;
+					indices.graphicsFamily = i;
+				}
+				
+				
 			}
 			// Early exit
 			if (indices.isComplete()) break;
