@@ -10,6 +10,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib> // provides exit success and exit failure macros
+#include <optional>
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -32,6 +33,16 @@ private:
 	vk::InstanceCreateInfo createInfo{};
 	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
+	/* Member structs */
+	struct QueueFamilyIndeces {
+		std::optional<uint32_t> graphicsFamily; // std optional is a wrapper that contains no value until ou assign something to it.
+		
+		// generic check inline
+		bool isComplete() {
+			return graphicsFamily.has_value();
+		}
+	};
+
 
 	/* Member functions */
 	void initWindow() {
@@ -45,11 +56,18 @@ private:
 
 
 	void initVulkan() {
+
+		// 1. INIT
 		createInstance();
 
+		// 2. Find physical device
 		pickPhysicalDevice();
+
+		// 3. Find logical device
+		
 	}
 	
+	/* 1. INIT VULKAN */
 	void createInstance() {
 		vk::ApplicationInfo appInfo{};
 		appInfo.sType = vk::StructureType::eApplicationInfo;
@@ -80,6 +98,7 @@ private:
 		}
 	}
 
+	/* 2. Pick physical device */
 	void pickPhysicalDevice() {
 		uint32_t deviceCount = 0;
 		auto devices = instance.enumeratePhysicalDevices();
@@ -104,7 +123,8 @@ private:
 
 	}
 
-	// Helper func
+	
+	// Physical device helper func
 	bool isDeviceSuitable(vk::PhysicalDevice device) {
 		vk::PhysicalDeviceProperties deviceProperties;
 		deviceProperties = device.getProperties();
@@ -112,8 +132,33 @@ private:
 		vk::PhysicalDeviceFeatures deviceFeatures;
 		deviceFeatures = device.getFeatures();
 
-		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader;
+		// deal with queues
+		QueueFamilyIndeces indices = findQueueFamilies(device);
+
+		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader && indices.graphicsFamily.has_value();
 	}
+
+	/* 3. Find logical device */
+	QueueFamilyIndeces findQueueFamilies(vk::PhysicalDevice device) {
+		QueueFamilyIndeces indices;
+
+		uint32_t queueFamilyCount = 0;
+		std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) {
+			if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+			{
+				indices.graphicsFamily = i;
+			}
+			// Early exit
+			if (indices.isComplete()) break;
+
+			i++;
+		}
+		return indices;
+	}
+
 
 	
 	void mainLoop() {
