@@ -1,6 +1,10 @@
+#define VK_USE_PLATFORM_WIN32_KHR
 #define GLFW_INCLUDE_VULKAN
 #include "glfw3.h"
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <glfw3native.h>
 #include <vulkan/vulkan.hpp>
+
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -11,6 +15,9 @@
 #include <stdexcept>
 #include <cstdlib> // provides exit success and exit failure macros
 #include <optional>
+
+
+
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -28,9 +35,11 @@ public:
 	
 private:
 	/* Member vars */
+	
 	GLFWwindow* window;
 	vk::Instance instance;
 	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	
 	// validation layers
 #ifdef NDEBUG
 	const bool enableValidationLayers = true;
@@ -42,7 +51,12 @@ private:
 	vk::Device logicalDevice;
 	vk::Queue graphicsQueue;
 
+	// surface creation
+	vk::SurfaceKHR surface;
+
+	
 	/* Member structs */
+	
 	// vulkan creation
 	vk::InstanceCreateInfo createInfo{};
 
@@ -80,10 +94,13 @@ private:
 		// 1. INIT
 		createInstance();
 
-		// 2. Find physical device
+		// 2. Create Surface
+		createSurface();
+
+		// 3. Find physical device
 		pickPhysicalDevice();
 
-		// 3. Find logical device (to interface with physical)
+		// 4. Find logical device (to interface with physical)
 		createLogicalDevice();
 	}
 	
@@ -117,8 +134,28 @@ private:
 			throw std::runtime_error("failed to create instance!");
 		}
 	}
+	
+	/* 2. Create Surface (vulkan object) */
+	void createSurface()
+	{
+		vk::Win32SurfaceCreateInfoKHR createSurfaceInfo{};
+		createSurfaceInfo.sType = vk::StructureType::eWin32SurfaceCreateInfoKHR;
+		createSurfaceInfo.hwnd = glfwGetWin32Window(window);
+		createSurfaceInfo.hinstance = GetModuleHandle(nullptr);
 
-	/* 2. Pick physical device */
+		vk::SurfaceKHR surface;
+
+		try {
+			surface = instance.createWin32SurfaceKHR(createSurfaceInfo);
+		}
+		catch (vk::SystemError& err)
+		{
+			throw std::runtime_error("Failed to create a surface");
+		}
+
+	}
+
+	/* 3. Pick physical device */
 	void pickPhysicalDevice() {
 		uint32_t deviceCount = 0;
 		auto devices = instance.enumeratePhysicalDevices();
@@ -159,7 +196,7 @@ private:
 		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader && indices.graphicsFamily.has_value();
 	}
 
-	/* 2. Queue families for physical device */
+	/* 3. Queue families for physical device */
 	QueueFamilyIndeces findQueueFamilies(vk::PhysicalDevice device) {
 		QueueFamilyIndeces indices;
 
@@ -180,7 +217,7 @@ private:
 		return indices;
 	}
 
-	/* 3. Find logical device */
+	/* 4. Find logical device */
 	void createLogicalDevice()
 	{
 		QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
@@ -235,7 +272,9 @@ private:
 
 		logicalDevice.destroy();
 
-		instance.destroy();
+		instance.destroySurfaceKHR(surface, nullptr);
+
+		instance.destroy(nullptr);
 		
 		glfwDestroyWindow(window);
 
