@@ -30,10 +30,23 @@ private:
 	/* Member vars */
 	GLFWwindow* window;
 	vk::Instance instance;
-	vk::InstanceCreateInfo createInfo{};
 	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
+	// validation layers
+#ifdef NDEBUG
+	const bool enableValidationLayers = true;
+#else
+	const bool enableValidationLayers = false;
+#endif
+
+	// logical device
+	vk::Device logicalDevice;
+	vk::Queue graphicsQueue;
 
 	/* Member structs */
+	// vulkan creation
+	vk::InstanceCreateInfo createInfo{};
+
+	// physical dvice
 	struct QueueFamilyIndeces {
 		std::optional<uint32_t> graphicsFamily; // std optional is a wrapper that contains no value until ou assign something to it.
 		
@@ -42,6 +55,13 @@ private:
 			return graphicsFamily.has_value();
 		}
 	};
+	
+
+	
+	vk::PhysicalDeviceFeatures deviceFeatures{};
+
+	// logical device
+	vk::DeviceCreateInfo deviceCreateInfo{};
 
 
 	/* Member functions */
@@ -63,8 +83,8 @@ private:
 		// 2. Find physical device
 		pickPhysicalDevice();
 
-		// 3. Find logical device
-		
+		// 3. Find logical device (to interface with physical)
+		createLogicalDevice();
 	}
 	
 	/* 1. INIT VULKAN */
@@ -92,7 +112,7 @@ private:
 
 		//vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
 
-		// check if successful
+		// create instance && throw run time error if unsuccessful
 		if (vk::createInstance(&createInfo, nullptr, &instance) != vk::Result::eSuccess) {
 			throw std::runtime_error("failed to create instance!");
 		}
@@ -121,6 +141,7 @@ private:
 			throw std::runtime_error("failed to find a suitable GPU!");
 		}
 
+
 	}
 
 	
@@ -129,7 +150,7 @@ private:
 		vk::PhysicalDeviceProperties deviceProperties;
 		deviceProperties = device.getProperties();
 
-		vk::PhysicalDeviceFeatures deviceFeatures;
+		//vk::PhysicalDeviceFeatures deviceFeatures;
 		deviceFeatures = device.getFeatures();
 
 		// deal with queues
@@ -138,7 +159,7 @@ private:
 		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader && indices.graphicsFamily.has_value();
 	}
 
-	/* 3. Find logical device */
+	/* 2. Queue families for physical device */
 	QueueFamilyIndeces findQueueFamilies(vk::PhysicalDevice device) {
 		QueueFamilyIndeces indices;
 
@@ -159,7 +180,50 @@ private:
 		return indices;
 	}
 
+	/* 3. Find logical device */
+	void createLogicalDevice()
+	{
+		QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
+		vk::PhysicalDeviceFeatures deviceFeatures = physicalDevice.getFeatures();
 
+		// Have to create a local var
+		vk::DeviceQueueCreateInfo queueCreateInfo{};
+		queueCreateInfo.sType = vk::StructureType::eDeviceQueueCreateInfo;
+		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
+		queueCreateInfo.queueCount = 1;
+
+		// Priorities
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		// device create info
+		deviceCreateInfo.sType = vk::StructureType::eDeviceCreateInfo;
+		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
+
+		// extensions and layers
+		deviceCreateInfo.enabledExtensionCount = 0;
+		if (enableValidationLayers)
+		{
+			//ignore for now
+			//deviceCreateInfo.enabledLayerCount = static_cast<uint_32_t>(validationLayers.size());
+		}
+
+
+		// create logical device		
+		try
+		{
+			logicalDevice = physicalDevice.createDevice(deviceCreateInfo);
+		}
+		catch (vk::SystemError& err)
+		{
+			throw std::runtime_error("Failed to create a logical device");
+		}
+
+		// If successful, retrieve queue
+		graphicsQueue = logicalDevice.getQueue(indices.graphicsFamily.value(), 0);
+	}
 	
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
@@ -168,6 +232,9 @@ private:
 	}
 
 	void cleanup() {
+
+		logicalDevice.destroy();
+
 		instance.destroy();
 		
 		glfwDestroyWindow(window);
