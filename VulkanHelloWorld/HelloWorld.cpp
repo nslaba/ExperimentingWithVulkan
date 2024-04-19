@@ -66,7 +66,7 @@ private:
 		std::optional<uint32_t> presentFamily;
 		// generic check inline
 		bool isComplete() {
-			return graphicsFamily.has_value();
+			return graphicsFamily.has_value() && presentFamily.has_value();
 		}
 	};
 	
@@ -143,7 +143,7 @@ private:
 		createSurfaceInfo.hwnd = glfwGetWin32Window(window);
 		createSurfaceInfo.hinstance = GetModuleHandle(nullptr);
 
-		vk::SurfaceKHR surface;
+		
 
 		try {
 			surface = instance.createWin32SurfaceKHR(createSurfaceInfo);
@@ -204,21 +204,23 @@ private:
 		std::vector<vk::QueueFamilyProperties> queueFamilies = device.getQueueFamilyProperties();
 
 		vk::Bool32 presentSupport = false; 
-
+		
 		int i = 0;
 		for (const auto& queueFamily : queueFamilies) {
 			presentSupport = device.getSurfaceSupportKHR(i, surface);
-			// CHECK THIS IT COULD BE WRONG -- MY BRAIN ISN't WORKING ANYMORE. TBC
+			
+			// Regarding graphics families
 			if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
-			{
-				if (presentSupport)
-				{
-					indices.presentFamily = i;
-					indices.graphicsFamily = i;
-				}
-				
-				
+			{					
+				indices.graphicsFamily = i;
 			}
+			
+			 //Regarding surface families
+			if (presentSupport)
+			{
+				indices.presentFamily = i;
+			}
+			
 			// Early exit
 			if (indices.isComplete()) break;
 
