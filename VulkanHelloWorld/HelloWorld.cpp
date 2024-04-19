@@ -15,6 +15,7 @@
 #include <stdexcept>
 #include <cstdlib> // provides exit success and exit failure macros
 #include <optional>
+#include <set>
 
 
 
@@ -50,6 +51,7 @@ private:
 	// logical device
 	vk::Device logicalDevice;
 	vk::Queue graphicsQueue;
+	vk::Queue presentQueue;
 
 	// surface creation
 	vk::SurfaceKHR surface;
@@ -77,6 +79,18 @@ private:
 	// logical device
 	vk::DeviceCreateInfo deviceCreateInfo{};
 
+	// queue family shtuff
+	QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
+
+	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+	std::set<uint32_t> uniqueQueueFammilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+
+	float queuePriority = 1.0f;
+	//for (uint32_t queueFamily : uniqueQueueFammilies) {
+	//	vk::DeviceQueueCreateInfo queueCreateInfo{};
+	//	queueCreateInfo.sType = vk::StructureTypeDeviceQueueCreateInfo;
+	//}
+	// THIS IS WHERE I LEFT OFF, TBC
 
 	/* Member functions */
 	void initWindow() {
