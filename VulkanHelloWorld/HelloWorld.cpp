@@ -79,17 +79,6 @@ private:
 	// logical device
 	vk::DeviceCreateInfo deviceCreateInfo{};
 
-	// queue family shtuff
-	QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
-
-	std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-	std::set<uint32_t> uniqueQueueFammilies = { indices.graphicsFamily.value(), indices.presentFamily.value() };
-
-	float queuePriority = 1.0f;
-	//for (uint32_t queueFamily : uniqueQueueFammilies) {
-	//	vk::DeviceQueueCreateInfo queueCreateInfo{};
-	//	queueCreateInfo.sType = vk::StructureTypeDeviceQueueCreateInfo;
-	//}
 	// THIS IS WHERE I LEFT OFF, TBC
 
 	/* Member functions */
@@ -247,22 +236,29 @@ private:
 	void createLogicalDevice()
 	{
 		QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
-		vk::PhysicalDeviceFeatures deviceFeatures = physicalDevice.getFeatures();
 
-		// Have to create a local var
-		vk::DeviceQueueCreateInfo queueCreateInfo{};
-		queueCreateInfo.sType = vk::StructureType::eDeviceQueueCreateInfo;
-		queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-		queueCreateInfo.queueCount = 1;
+		// Create struct for both presentation and family queue indices:
 
-		// Priorities
+		std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
+		std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() }; // ensure that each queue family index is stored only once.
+
 		float queuePriority = 1.0f;
-		queueCreateInfo.pQueuePriorities = &queuePriority;
+		for (uint32_t queueFamily : uniqueQueueFamilies) {
+			vk::DeviceQueueCreateInfo queueCreateInfo{};
+			queueCreateInfo.sType = vk::StructureType::eDeviceQueueCreateInfo; 
+			queueCreateInfo.queueFamilyIndex = queueFamily;
+			queueCreateInfo.queueCount = 1;
+			queueCreateInfo.pQueuePriorities = &queuePriority;
+			queueCreateInfos.push_back(queueCreateInfo);
+		}
+		
+
+		vk::PhysicalDeviceFeatures deviceFeatures = physicalDevice.getFeatures();
 
 		// device create info
 		deviceCreateInfo.sType = vk::StructureType::eDeviceCreateInfo;
-		deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
-		deviceCreateInfo.queueCreateInfoCount = 1;
+		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
+		deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
 		// extensions and layers
@@ -286,6 +282,7 @@ private:
 
 		// If successful, retrieve queue
 		graphicsQueue = logicalDevice.getQueue(indices.graphicsFamily.value(), 0);
+		presentQueue = logicalDevice.getQueue(indices.presentFamily.value(), 0);
 	}
 	
 	void mainLoop() {
