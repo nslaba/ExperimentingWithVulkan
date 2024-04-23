@@ -290,8 +290,19 @@ private:
 		deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
 		deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
+		std::vector<vk::ExtensionProperties> deviceExtensions = physicalDevice.enumerateDeviceExtensionProperties();
+
 		// extensions and layers
-		deviceCreateInfo.enabledExtensionCount = 0;
+		deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
+
+		// extract the names to const char*
+		std::vector<const char*> extensionNames;
+		for (const auto& extension : deviceExtensions)
+		{
+			extensionNames.push_back(extension.extensionName);
+		}
+		deviceCreateInfo.ppEnabledExtensionNames = extensionNames.data();
+
 		if (enableValidationLayers)
 		{
 			//ignore for now
