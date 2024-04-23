@@ -79,7 +79,11 @@ private:
 	// logical device
 	vk::DeviceCreateInfo deviceCreateInfo{};
 
-	// THIS IS WHERE I LEFT OFF, TBC
+	// swap chains
+	const std::vector<const char*> deviceExtension = {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+	};
+
 
 	/* Member functions */
 	void initWindow() {
@@ -196,7 +200,32 @@ private:
 		// deal with queues
 		QueueFamilyIndeces indices = findQueueFamilies(device);
 
-		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader && indices.graphicsFamily.has_value();
+		bool extensionsSupported = checkDeviceExtensionSupport(device);
+
+		return deviceProperties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu && deviceFeatures.geometryShader && indices.isComplete() && extensionsSupported;
+	}
+
+	bool checkDeviceExtensionSupport(vk::PhysicalDevice device)
+	{
+
+		uint32_t extensionCount;
+		 
+		if (device.enumerateDeviceExtensionProperties(nullptr, &extensionCount, nullptr) != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to enumerate device extension properties");
+		}
+
+		std::vector<vk::ExtensionProperties> availableExtensions(extensionCount);
+		if (device.enumerateDeviceExtensionProperties(nullptr, &extensionCount, availableExtensions.data()) != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to enumerate device extension properties with available extension data");
+		}
+
+		std::set<std::string> requiredExtensions(deviceExtension.begin(), deviceExtension.end());
+
+		for (const auto& extension : availableExtensions) {
+			requiredExtensions.erase(extension.extensionName);
+		}
+
+		return requiredExtensions.empty();
 	}
 
 	/* 3. Queue families for physical device */
