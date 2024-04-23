@@ -84,6 +84,11 @@ private:
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
 	};
 
+	struct SwapChainSupportDetails {
+		vk::SurfaceCapabilitiesKHR capabilities;
+		std::vector<vk::SurfaceFormatKHR> formats;
+		std::vector<vk::PresentModeKHR> presentModes;
+	};
 
 	/* Member functions */
 	void initWindow() {
@@ -109,6 +114,9 @@ private:
 
 		// 4. Find logical device (to interface with physical)
 		createLogicalDevice();
+
+		// TEMP
+		SwapChainSupportDetails details = querySwapChainSupport(physicalDevice);
 	}
 	
 	/* 1. INIT VULKAN */
@@ -323,6 +331,27 @@ private:
 		// If successful, retrieve queue
 		graphicsQueue = logicalDevice.getQueue(indices.graphicsFamily.value(), 0);
 		presentQueue = logicalDevice.getQueue(indices.presentFamily.value(), 0);
+	}
+
+	// SWAP CHAINS
+	SwapChainSupportDetails querySwapChainSupport(vk::PhysicalDevice device)
+	{
+		SwapChainSupportDetails details;
+		// Capabilities
+		details.capabilities = device.getSurfaceCapabilitiesKHR(surface);
+
+		// Formats
+		uint32_t formatCount = sizeof(device.getSurfaceFormatsKHR(nullptr));
+		if (formatCount != 0) {
+			details.formats.resize(formatCount);
+			//details.formats = device.getSurfaceFormatsKHR(surface, formatCount);
+		}
+		//details.formats = device.getSurfaceFormatsKHR(surface, nullptr);
+		// TBC NOT SURE WHY CODE IS BEING OPTIMIZED OUT
+		// Present Modes
+		details.presentModes = device.getSurfacePresentModesKHR(surface);
+
+		return details;
 	}
 	
 	void mainLoop() {
