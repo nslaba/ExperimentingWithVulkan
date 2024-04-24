@@ -17,6 +17,10 @@
 #include <optional>
 #include <set>
 
+// TRYING
+//#define VULKAN_HPP_DISABLE_ENHANCED_MODE
+
+
 
 
 
@@ -341,15 +345,20 @@ private:
 		details.capabilities = device.getSurfaceCapabilitiesKHR(surface);
 
 		// Formats
-		uint32_t formatCount = sizeof(device.getSurfaceFormatsKHR(nullptr));
-		if (formatCount != 0) {
-			details.formats.resize(formatCount);
-			//details.formats = device.getSurfaceFormatsKHR(surface, formatCount);
-		}
-		//details.formats = device.getSurfaceFormatsKHR(surface, nullptr);
-		// TBC NOT SURE WHY CODE IS BEING OPTIMIZED OUT
+		details.formats = device.getSurfaceFormatsKHR(surface);
+		assert(!details.formats.empty());
+		details.formats[0].format = (details.formats[0].format == vk::Format::eUndefined) ? vk::Format::eB8G8R8A8Unorm : details.formats[0].format; // ensure there's a val
+
 		// Present Modes
-		details.presentModes = device.getSurfacePresentModesKHR(surface);
+		uint32_t presentModeCount;
+		device.getSurfacePresentModesKHR(surface, &presentModeCount, nullptr);
+		if (presentModeCount != 0)
+		{
+			details.presentModes.resize(presentModeCount);
+			device.getSurfacePresentModesKHR(surface, &presentModeCount, details.presentModes.data());
+		}
+		
+		
 
 		return details;
 	}
