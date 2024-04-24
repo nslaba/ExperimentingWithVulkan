@@ -64,6 +64,10 @@ private:
 
 	// swap chain
 	vk::SwapchainKHR swapChain;
+	vk::Extent2D swapChainExtent;
+	// retrieving swap chain images
+	std::vector<vk::Image> swapChainImages;
+	vk::Format swapChainImageFormat;
 	
 	/* Member structs */
 	
@@ -98,6 +102,7 @@ private:
 		std::vector<vk::PresentModeKHR> presentModes;
 	};
 
+	
 	
 
 	/* Member functions */
@@ -434,7 +439,8 @@ private:
 
 		vk::SurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
 		vk::PresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
-		vk::Extent2D extent = chooseSwapExtent(swapChainSupport.capabilities);
+		swapChainExtent = chooseSwapExtent(swapChainSupport.capabilities);
+		swapChainImageFormat = surfaceFormat.format;
 
 		// num of images
 		uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
@@ -465,9 +471,9 @@ private:
 		createSwapChainInfo.surface = surface;
 
 		createSwapChainInfo.minImageCount = imageCount;
-		createSwapChainInfo.imageFormat = surfaceFormat.format;
+		createSwapChainInfo.imageFormat = swapChainImageFormat;
 		createSwapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
-		createSwapChainInfo.imageExtent = extent;
+		createSwapChainInfo.imageExtent = swapChainExtent;
 		createSwapChainInfo.imageArrayLayers = 1;
 		createSwapChainInfo.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
 		createSwapChainInfo.preTransform = swapChainSupport.capabilities.currentTransform;
@@ -484,6 +490,11 @@ private:
 		{
 			throw std::runtime_error("Failed to create swap chain!");
 		}
+
+		// retrieve images
+		assert(logicalDevice.getSwapchainImagesKHR(swapChain, &imageCount, nullptr) == vk::Result::eSuccess);
+		swapChainImages.resize(imageCount);
+		assert(logicalDevice.getSwapchainImagesKHR(swapChain, &imageCount, swapChainImages.data()) == vk::Result::eSuccess);
 	}
 	
 	void mainLoop() {
