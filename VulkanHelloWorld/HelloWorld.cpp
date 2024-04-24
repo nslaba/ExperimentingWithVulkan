@@ -102,7 +102,8 @@ private:
 		std::vector<vk::PresentModeKHR> presentModes;
 	};
 
-	
+	// Image views
+	std::vector<vk::ImageView> swapChainImageViews;
 	
 
 	/* Member functions */
@@ -132,6 +133,9 @@ private:
 
 		// 5. Create Swap chains
 		createSwapChain();
+
+		// 6. create Image views
+		createImageViews();
 
 	}
 	
@@ -496,6 +500,41 @@ private:
 		swapChainImages.resize(imageCount);
 		assert(logicalDevice.getSwapchainImagesKHR(swapChain, &imageCount, swapChainImages.data()) == vk::Result::eSuccess);
 	}
+
+
+	// 6. Create Image views
+	void createImageViews()
+	{
+		swapChainImageViews.resize(swapChainImages.size());
+
+		for (size_t i = 0; i < swapChainImages.size(); i++)
+		{
+			vk::ImageViewCreateInfo createInfo{};
+			createInfo.sType = vk::StructureType::eImageViewCreateInfo;
+			createInfo.image = swapChainImages[i];
+			createInfo.viewType = vk::ImageViewType::e2D;
+			createInfo.format = swapChainImageFormat;
+			// Could get creative with this later.
+			createInfo.components.r = vk::ComponentSwizzle::eIdentity;
+			createInfo.components.g = vk::ComponentSwizzle::eIdentity;
+			createInfo.components.b = vk::ComponentSwizzle::eIdentity;
+			createInfo.components.a = vk::ComponentSwizzle::eIdentity;
+			createInfo.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+
+			// create image view
+			try {
+				logicalDevice.createImageView(createInfo);
+			}
+			catch (const vk::SystemError& err){
+				throw std::runtime_error("Failed to create Image View!");
+			}
+
+		}
+	}
 	
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
@@ -504,6 +543,12 @@ private:
 	}
 
 	void cleanup() {
+
+		// clean up image views
+		for (auto imageView : swapChainImageViews)
+		{
+			logicalDevice.destroy(imageView);
+		}
 
 		logicalDevice.destroy(swapChain);
 
