@@ -23,7 +23,8 @@
 #include <algorithm> // for std::clamp
 
 #include <fstream>
-
+#include <sstream>
+#include <stdexcept>
 
 
 
@@ -70,11 +71,13 @@ private:
 	// retrieving swap chain images
 	std::vector<vk::Image> swapChainImages;
 	vk::Format swapChainImageFormat;
+	std::vector<vk::Framebuffer> swapChainFramebuffers;
 
 	// Pipeline
 	vk::RenderPass renderPass;
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
+	
 	
 	/* Member structs */
 	
@@ -149,6 +152,9 @@ private:
 
 		// 8. create Graphics Pipeline
 		createGraphicsPipeline();
+		
+		// 9. Create Framebuffer
+		createFramebuffers();
 
 	}
 	
@@ -797,6 +803,38 @@ private:
 		file.close();
 		return buffer;
 	}
+
+	// 9. Create Framebuffer
+	void createFramebuffers() {
+		swapChainFramebuffers.resize(swapChainImageViews.size());
+		// Iterate through image views and create frame buffer for them
+		for (size_t i = 0; i < swapChainImageViews.size(); i++)
+		{
+			vk::ImageView attachments[] = {
+				swapChainImageViews[i]
+			};
+
+			vk::FramebufferCreateInfo framebufferInfo{};
+			framebufferInfo.sType = vk::StructureType::eFramebufferCreateInfo;
+			framebufferInfo.renderPass = renderPass;
+			framebufferInfo.attachmentCount = 1;
+			framebufferInfo.pAttachments = attachments;
+			framebufferInfo.width = swapChainExtent.width;
+			framebufferInfo.height = swapChainExtent.height;
+			framebufferInfo.layers = 1;
+
+			try {
+				swapChainFramebuffers[i] = logicalDevice.createFramebuffer(framebufferInfo);
+			}
+			catch (const vk::SystemError& err) {
+				std::ostringstream oss;
+				oss << "Failed to create a framebuffer for: " << i;
+				throw std::runtime_error(oss.str());
+			}
+		}
+	}
+
+
 	
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
@@ -805,7 +843,7 @@ private:
 	}
 
 	void cleanup() {
-
+		logicalDevice.destroyPipeline(graphicsPipeline);
 		logicalDevice.destroyPipelineLayout(pipelineLayout);
 		logicalDevice.destroyRenderPass(renderPass);
 		// clean up image views
