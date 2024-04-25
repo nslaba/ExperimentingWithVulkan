@@ -72,6 +72,7 @@ private:
 	vk::Format swapChainImageFormat;
 
 	// Pipeline
+	vk::RenderPass renderPass;
 	vk::PipelineLayout pipelineLayout;
 	
 	/* Member structs */
@@ -559,6 +560,32 @@ private:
 		colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
 		colorAttachment.initialLayout = vk::ImageLayout::eUndefined; // means we don't care what previous image was in
 		colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR; //images to be presented in the swap chain
+
+		// Subpasses and Attachment refs
+		vk::AttachmentReference colorAttachmentRef{};
+		colorAttachmentRef.attachment = 0; // since the array consists of a single attachment description and so this is its index
+		colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
+		
+		vk::SubpassDescription subpass{};
+		subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &colorAttachmentRef;
+
+		// create the render pass
+		vk::RenderPassCreateInfo renderPassInfo{};
+		renderPassInfo.sType = vk::StructureType::eRenderPassCreateInfo;
+		renderPassInfo.attachmentCount = 1;
+		renderPassInfo.pAttachments = &colorAttachment;
+		renderPassInfo.subpassCount = 1;
+		renderPassInfo.pSubpasses = &subpass;
+
+		try {
+			renderPass = logicalDevice.createRenderPass(renderPassInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create Render Pass!");
+		}
+
 	}
 
 	// 8. create graphics pipeline
@@ -755,7 +782,7 @@ private:
 	void cleanup() {
 
 		logicalDevice.destroyPipelineLayout(pipelineLayout);
-
+		logicalDevice.destroyRenderPass(renderPass);
 		// clean up image views
 		for (auto imageView : swapChainImageViews)
 		{
