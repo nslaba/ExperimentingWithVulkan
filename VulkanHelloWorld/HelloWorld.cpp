@@ -137,6 +137,9 @@ private:
 		// 6. create Image views
 		createImageViews();
 
+		// 7. create Graphics Pipeline
+		createGraphicsPipeline();
+
 	}
 	
 	/* 1. INIT VULKAN */
@@ -534,6 +537,12 @@ private:
 			}
 
 		}
+	}
+
+	// 7. create graphics pipeline
+	void createGraphicsPipeline()
+	{
+
 	}
 	
 	void mainLoop() {
