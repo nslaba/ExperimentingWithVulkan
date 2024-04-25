@@ -22,6 +22,8 @@
 #include <limits> // for std::numeric_limits
 #include <algorithm> // for std::clamp
 
+#include <fstream>
+
 
 
 
@@ -542,7 +544,76 @@ private:
 	// 7. create graphics pipeline
 	void createGraphicsPipeline()
 	{
+		auto vertShaderCode = readFile("Shaders/vert.spv");
+		auto fragShaderCode = readFile("Shaders/frag.spv");
 
+		vk::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+		vk::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+		// Need to assign shaders to pipeline stages
+		vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
+		vertShaderStageInfo.sType = vk::StructureType::ePipelineShaderStageCreateInfo;
+		vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
+
+		vertShaderStageInfo.module = vertShaderModule;
+		vertShaderStageInfo.pName = "main"; // entrypoint in the glsl code -- could combine multiple shaders with different entry points
+
+
+		vk::PipelineShaderStageCreateInfo fragShaderStageInfo{};
+		fragShaderStageInfo.sType = vk::StructureType::ePipelineShaderStageCreateInfo;
+		fragShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
+		fragShaderStageInfo.module = fragShaderModule;
+		fragShaderStageInfo.pName = "main";
+
+		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+
+
+
+		// Clean up
+		logicalDevice.destroyShaderModule(fragShaderModule);
+		logicalDevice.destroyShaderModule(vertShaderModule);
+	}
+
+	// helper func to create shader mod obj
+	vk::ShaderModule createShaderModule(const std::vector<char>& code)
+	{
+		vk::ShaderModuleCreateInfo createInfo{};
+		createInfo.sType = vk::StructureType::eShaderModuleCreateInfo;
+		createInfo.codeSize = code.size();
+		createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+		vk::ShaderModule shaderModule;
+
+		try {
+			shaderModule =logicalDevice.createShaderModule(createInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create shader module!");
+		}
+
+		return shaderModule;
+	}
+
+	static std::vector<char> readFile(const std::string& filename)
+	{
+		std::ifstream file(filename, std::ios::ate | std::ios::binary); // ate starts reading eof . . . binary reads as binary
+
+		if (!file.is_open()) {
+			throw std::runtime_error("Failed to open file!");
+		}
+
+		// get size knowing eof
+		size_t fileSize = (size_t)file.tellg();
+		std::vector<char> buffer(fileSize);
+
+		// back to beginning
+		file.seekg(0);
+		file.read(buffer.data(), fileSize);
+		
+		// close file
+		file.close();
+		return buffer;
 	}
 	
 	void mainLoop() {
