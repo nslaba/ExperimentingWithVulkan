@@ -888,6 +888,20 @@ private:
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to begin recording command buffer" + std::string(err.what()));
 		}
+
+		// render pass
+		vk::RenderPassBeginInfo renderPassInfo{};
+		renderPassInfo.sType = vk::StructureType::eRenderPassBeginInfo;
+		renderPassInfo.renderPass = renderPass;
+		renderPassInfo.framebuffer = swapChainFramebuffers[imageIndex];
+		renderPassInfo.renderArea.offset = vk::Offset2D{ 0,0 };
+		renderPassInfo.renderArea.extent = swapChainExtent;
+
+		vk::ClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearColor;
+
+		commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 		
 	}
 
