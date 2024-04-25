@@ -74,6 +74,7 @@ private:
 	// Pipeline
 	vk::RenderPass renderPass;
 	vk::PipelineLayout pipelineLayout;
+	vk::Pipeline graphicsPipeline;
 	
 	/* Member structs */
 	
@@ -725,7 +726,31 @@ private:
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to create pipeline Layout!");
 		}
+
+		// Create graphics pipeline!!
+		vk::GraphicsPipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = vk::StructureType::eGraphicsPipelineCreateInfo;
+		pipelineInfo.stageCount = 2;
+		pipelineInfo.pStages = shaderStages;
+		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pInputAssemblyState = &inputAssembly;
+		pipelineInfo.pViewportState = &viewportState;
+		pipelineInfo.pRasterizationState = &rasterizer;
+		pipelineInfo.pMultisampleState = &multisampling;
+		pipelineInfo.pDepthStencilState = nullptr;
+		pipelineInfo.pColorBlendState = &colorBlending;
+		pipelineInfo.pDynamicState = &dynamicState;
+		pipelineInfo.layout = pipelineLayout;
+		pipelineInfo.renderPass = renderPass;
+		pipelineInfo.subpass = 0; //index
+		pipelineInfo.basePipelineHandle = nullptr;
+		pipelineInfo.basePipelineIndex = -1;
 		
+		vk::ResultValue<vk::Pipeline> result = logicalDevice.createGraphicsPipeline(VK_NULL_HANDLE, pipelineInfo);
+		if (result.result != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to create the Graphics Pipeline!");
+		}
+		graphicsPipeline = result.value;
 
 		// Clean up
 		logicalDevice.destroyShaderModule(fragShaderModule);
