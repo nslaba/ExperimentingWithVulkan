@@ -641,7 +641,27 @@ private:
 
 		// Depth and stencil testing will go here.
 
-		// Color Blending
+		// Color Blending -- per-Framebuffer struct
+		vk::PipelineColorBlendAttachmentState colorBlendAttachment{};
+		colorBlendAttachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
+		colorBlendAttachment.blendEnable = vk::False;
+		colorBlendAttachment.srcColorBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.dstColorBlendFactor = vk::BlendFactor::eZero;
+		colorBlendAttachment.colorBlendOp = vk::BlendOp::eAdd;
+		colorBlendAttachment.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+		colorBlendAttachment.dstAlphaBlendFactor = vk::BlendFactor::eZero;
+		colorBlendAttachment.alphaBlendOp = vk::BlendOp::eAdd;
+
+		vk::PipelineColorBlendStateCreateInfo colorBlending{};
+		colorBlending.sType = vk::StructureType::ePipelineColorBlendStateCreateInfo;
+		colorBlending.logicOpEnable = vk::False;
+		colorBlending.logicOp = vk::LogicOp::eCopy;
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+		colorBlending.blendConstants[0] = 0.0f;
+		colorBlending.blendConstants[1] = 0.0f;
+		colorBlending.blendConstants[2] = 0.0f;
+		colorBlending.blendConstants[3] = 0.0f;
 
 
 		// Clean up
