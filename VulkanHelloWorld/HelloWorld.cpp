@@ -79,6 +79,11 @@ private:
 	vk::Pipeline graphicsPipeline;
 	vk::CommandPool commandPool;
 	vk::CommandBuffer commandBuffer;
+
+	// Synchronization
+	vk::Semaphore imageAvailableSemaphore;
+	vk::Semaphore renderFinishedSemaphore;
+	vk::Fence inFlightFence;
 	
 	
 	/* Member structs */
@@ -163,6 +168,9 @@ private:
 
 		// 11. Create Command Buffer
 		createCommandBuffer();
+
+		// 12. Create Synhronization Objects
+		createSyncObjects();
 	}
 	
 	/* 1. INIT VULKAN */
@@ -936,13 +944,39 @@ private:
 
 	}
 
+	// 12. Create Synhronization Objects
+	void createSyncObjects() {
+		vk::SemaphoreCreateInfo semaphoreInfo{};
+		semaphoreInfo.sType = vk::StructureType::eSemaphoreCreateInfo;
+
+		vk::FenceCreateInfo fenceInfo{};
+		fenceInfo.sType = vk::StructureType::eFenceCreateInfo;
+
+		try {
+			imageAvailableSemaphore = logicalDevice.createSemaphore(semaphoreInfo);
+			renderFinishedSemaphore = logicalDevice.createSemaphore(semaphoreInfo);
+			inFlightFence = logicalDevice.createFence(fenceInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create synchronization objects" + std::string(err.what()));
+		}
+	}
+
+	void drawFrame() {
+
+	}
+
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
+			drawFrame();
 		}
 	}
 
 	void cleanup() {
+		logicalDevice.destroySemaphore(imageAvailableSemaphore);
+		logicalDevice.destroySemaphore(renderFinishedSemaphore);
+		logicalDevice.destroyFence(inFlightFence);
 		logicalDevice.destroyCommandPool(commandPool);
 
 		for (auto framebuffer : swapChainFramebuffers) {
