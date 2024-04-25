@@ -142,7 +142,10 @@ private:
 		// 6. create Image views
 		createImageViews();
 
-		// 7. create Graphics Pipeline
+		// 7. Create Render Pass
+		createRenderPass();
+
+		// 8. create Graphics Pipeline
 		createGraphicsPipeline();
 
 	}
@@ -544,7 +547,21 @@ private:
 		}
 	}
 
-	// 7. create graphics pipeline
+	// 7. Create Render Pass
+	void createRenderPass() {
+		// single color buffer attachment
+		vk::AttachmentDescription colorAttachment{};
+		colorAttachment.format = swapChainImageFormat;
+		colorAttachment.samples = vk::SampleCountFlagBits::e1;
+		colorAttachment.loadOp = vk::AttachmentLoadOp::eClear; // what to do with data before rendering -- clears framebuffer to black before drawing new frame
+		colorAttachment.storeOp = vk::AttachmentStoreOp::eStore; // what to do with data after rendering -- renderred contents will be stored in mem and can be read later
+		colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare; // Not using stencil buffer for now
+		colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+		colorAttachment.initialLayout = vk::ImageLayout::eUndefined; // means we don't care what previous image was in
+		colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR; //images to be presented in the swap chain
+	}
+
+	// 8. create graphics pipeline
 	void createGraphicsPipeline()
 	{
 		auto vertShaderCode = readFile("Shaders/vert.spv");
