@@ -77,6 +77,7 @@ private:
 	vk::RenderPass renderPass;
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
+	vk::CommandPool commandPool;
 	
 	
 	/* Member structs */
@@ -156,6 +157,8 @@ private:
 		// 9. Create Framebuffer
 		createFramebuffers();
 
+		// 10. Create Command pool
+		createCommandPool();
 	}
 	
 	/* 1. INIT VULKAN */
@@ -834,7 +837,22 @@ private:
 		}
 	}
 
+	// 10. Create Command pool
+	void createCommandPool() {
+		QueueFamilyIndeces queueFamilyIndices = findQueueFamilies(physicalDevice);
 
+		vk::CommandPoolCreateInfo poolInfo{};
+		poolInfo.sType = vk::StructureType::eCommandPoolCreateInfo;
+		poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer; // allow command buffers to be rerecorded individually
+		poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+
+		try {
+			commandPool = logicalDevice.createCommandPool(poolInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create command pool!");
+		}
+	}
 	
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
@@ -843,6 +861,11 @@ private:
 	}
 
 	void cleanup() {
+		logicalDevice.destroyCommandPool(commandPool);
+
+		for (auto framebuffer : swapChainFramebuffers) {
+			logicalDevice.destroyFramebuffer(framebuffer);
+		}
 		logicalDevice.destroyPipeline(graphicsPipeline);
 		logicalDevice.destroyPipelineLayout(pipelineLayout);
 		logicalDevice.destroyRenderPass(renderPass);
