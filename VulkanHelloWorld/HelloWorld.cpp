@@ -897,12 +897,43 @@ private:
 		renderPassInfo.renderArea.offset = vk::Offset2D{ 0,0 };
 		renderPassInfo.renderArea.extent = swapChainExtent;
 
-		vk::ClearValue clearColor = { {{0.0f, 0.0f, 0.0f, 1.0f}} };
+		vk::ClearColorValue clearColor(std::array<float, 4> {{0.0f, 0.0f, 0.0f, 1.0f}});
+		vk::ClearValue clearValue;
+		clearValue.color = clearColor;
 		renderPassInfo.clearValueCount = 1;
-		renderPassInfo.pClearValues = &clearColor;
+		renderPassInfo.pClearValues = &clearValue;
 
 		commandBuffer.beginRenderPass(renderPassInfo, vk::SubpassContents::eInline);
 		
+		// Drawing commands
+		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
+
+		// handle dynamic viewport and scissor state
+		vk::Viewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = static_cast<float>(swapChainExtent.width);
+		viewport.height = static_cast<float>(swapChainExtent.height);
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+		commandBuffer.setViewport(0, 1, &viewport);
+
+		vk::Rect2D scissor{};
+		scissor.offset = vk::Offset2D{ 0, 0 };
+		scissor.extent = swapChainExtent;
+		commandBuffer.setScissor(0, 1, &scissor);
+
+		commandBuffer.draw(3, 1, 0, 0); // vertex count (3 vertices to draw), instance count, first vertex (offset into the vertex buffer), first instance (offset for instanced rendering)
+
+		commandBuffer.endRenderPass();
+
+		try {
+			commandBuffer.end();
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to record command buffer!" + std::string(err.what()));
+		}
+
 	}
 
 	void mainLoop() {
