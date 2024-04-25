@@ -554,7 +554,6 @@ private:
 		vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
 		vertShaderStageInfo.sType = vk::StructureType::ePipelineShaderStageCreateInfo;
 		vertShaderStageInfo.stage = vk::ShaderStageFlagBits::eVertex;
-
 		vertShaderStageInfo.module = vertShaderModule;
 		vertShaderStageInfo.pName = "main"; // entrypoint in the glsl code -- could combine multiple shaders with different entry points
 
@@ -567,7 +566,82 @@ private:
 
 		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
+		// Vertex input
+		vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+		vertexInputInfo.sType = vk::StructureType::ePipelineVertexInputStateCreateInfo;
+		vertexInputInfo.vertexBindingDescriptionCount = 0;
+		vertexInputInfo.pVertexBindingDescriptions = nullptr;
+		vertexInputInfo.vertexAttributeDescriptionCount = 0;
+		vertexInputInfo.pVertexAttributeDescriptions = nullptr;
 
+
+		// Input Assembly
+		vk::PipelineInputAssemblyStateCreateInfo inputAssembly{};
+		inputAssembly.sType = vk::StructureType::ePipelineInputAssemblyStateCreateInfo;
+		inputAssembly.topology = vk::PrimitiveTopology::eTriangleList;
+		inputAssembly.primitiveRestartEnable = vk::False;
+
+		// Viewport
+		vk::Viewport viewport{};
+		viewport.x = 0.0f;
+		viewport.y = 0.0f;
+		viewport.width = (float)swapChainExtent.width; // swap chain images will be used as framebuffers later on
+		viewport.height = (float)swapChainExtent.height;
+		viewport.minDepth = 0.0f;
+		viewport.maxDepth = 1.0f;
+
+		// Scissor (want to draw to the entire framebuffer
+		vk::Rect2D scissor{};
+		scissor.offset = vk::Offset2D{ 0, 0 };
+		scissor.extent = swapChainExtent;
+
+		// Option to keep dynamic states out of pipeline -- this will cause the config of these vals to be ignored. Required to specify the data at drawing time.
+		std::vector<vk::DynamicState> dynamicStates = {
+			vk::DynamicState::eViewport,
+			vk::DynamicState::eScissor
+		};
+
+		vk::PipelineDynamicStateCreateInfo dynamicState{};
+		dynamicState.sType = vk::StructureType::ePipelineDynamicStateCreateInfo;
+		dynamicState.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
+		dynamicState.pDynamicStates = dynamicStates.data();
+
+
+		// THIS HAS TO BE AT PIPELINE CREATION TIME -- setting pViewports and pScissors makes it immutable the way I have it OR I can set that at drawing time.
+		vk::PipelineViewportStateCreateInfo viewportState{};
+		viewportState.sType = vk::StructureType::ePipelineViewportStateCreateInfo;
+		viewportState.viewportCount = 1;
+		viewportState.pViewports = &viewport;
+		viewportState.scissorCount = 1;
+		viewportState.pScissors = &scissor;
+
+		// Rasterizer
+		vk::PipelineRasterizationStateCreateInfo rasterizer{};
+		rasterizer.sType = vk::StructureType::ePipelineRasterizationStateCreateInfo;
+		rasterizer.depthClampEnable = vk::False; // if this is true, then fragments beyond near and far planes are clamped -- useful for shadowmaps.
+		rasterizer.rasterizerDiscardEnable = vk::False; // of this is true, then geom doesn't pass through rasterizer stage.
+		rasterizer.polygonMode = vk::PolygonMode::eFill; // how fragments are generated for geom
+		rasterizer.lineWidth = 1.0f;
+		rasterizer.cullMode = vk::CullModeFlagBits::eBack;
+		rasterizer.frontFace = vk::FrontFace::eClockwise;
+		rasterizer.depthBiasEnable = vk::False;
+		rasterizer.depthBiasConstantFactor = 0.0f;
+		rasterizer.depthBiasClamp = 0.0f;
+		rasterizer.depthBiasSlopeFactor = 0.0f;
+
+		// Multisampling
+		vk::PipelineMultisampleStateCreateInfo multisampling{};
+		multisampling.sType = vk::StructureType::ePipelineMultisampleStateCreateInfo;
+		multisampling.sampleShadingEnable = vk::False;
+		multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
+		multisampling.minSampleShading = 1.0f;
+		multisampling.pSampleMask = nullptr;
+		multisampling.alphaToCoverageEnable = vk::False;
+		multisampling.alphaToOneEnable = vk::False;
+
+		// Depth and stencil testing will go here.
+
+		// Color Blending
 
 
 		// Clean up
