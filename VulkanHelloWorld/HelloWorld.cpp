@@ -70,6 +70,9 @@ private:
 	// retrieving swap chain images
 	std::vector<vk::Image> swapChainImages;
 	vk::Format swapChainImageFormat;
+
+	// Pipeline
+	vk::PipelineLayout pipelineLayout;
 	
 	/* Member structs */
 	
@@ -663,6 +666,22 @@ private:
 		colorBlending.blendConstants[2] = 0.0f;
 		colorBlending.blendConstants[3] = 0.0f;
 
+		// Pipeline Layout
+		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+		pipelineLayoutInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
+		pipelineLayoutInfo.setLayoutCount = 0;
+		pipelineLayoutInfo.pSetLayouts = nullptr;
+		pipelineLayoutInfo.pushConstantRangeCount = 0; // another way of passing dynamic data to shaders
+		pipelineLayoutInfo.pPushConstantRanges = nullptr;
+
+		// create the layout
+		try {
+			pipelineLayout = logicalDevice.createPipelineLayout(pipelineLayoutInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create pipeline Layout!");
+		}
+		
 
 		// Clean up
 		logicalDevice.destroyShaderModule(fragShaderModule);
@@ -718,13 +737,15 @@ private:
 
 	void cleanup() {
 
+		logicalDevice.destroyPipelineLayout(pipelineLayout);
+
 		// clean up image views
 		for (auto imageView : swapChainImageViews)
 		{
-			logicalDevice.destroy(imageView);
+			logicalDevice.destroyImageView(imageView);
 		}
 
-		logicalDevice.destroy(swapChain);
+		logicalDevice.destroySwapchainKHR(swapChain);
 
 		logicalDevice.destroy();
 
