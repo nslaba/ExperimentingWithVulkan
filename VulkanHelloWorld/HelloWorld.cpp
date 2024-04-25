@@ -875,6 +875,22 @@ private:
 		}
 	}
 
+	void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
+
+		vk::CommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+		beginInfo.flags = vk::CommandBufferUsageFlags();
+		beginInfo.pInheritanceInfo = nullptr;
+
+		try {
+			commandBuffer.begin(beginInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to begin recording command buffer" + std::string(err.what()));
+		}
+		
+	}
+
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
