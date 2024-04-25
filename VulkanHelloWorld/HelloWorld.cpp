@@ -78,6 +78,7 @@ private:
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
 	vk::CommandPool commandPool;
+	vk::CommandBuffer commandBuffer;
 	
 	
 	/* Member structs */
@@ -159,6 +160,9 @@ private:
 
 		// 10. Create Command pool
 		createCommandPool();
+
+		// 11. Create Command Buffer
+		createCommandBuffer();
 	}
 	
 	/* 1. INIT VULKAN */
@@ -854,6 +858,23 @@ private:
 		}
 	}
 	
+	// 11. Create Command Buffer
+	void createCommandBuffer() {
+		vk::CommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+		allocInfo.commandPool = commandPool;
+		allocInfo.level = vk::CommandBufferLevel::ePrimary;
+		allocInfo.commandBufferCount = 1; // if primary or secondary
+
+		try {
+			std::vector<vk::CommandBuffer, std::allocator<vk::CommandBuffer>> result = logicalDevice.allocateCommandBuffers(allocInfo);
+			commandBuffer = result[0];
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to create a command buffers!" + std::string(err.what()));
+		}
+	}
+
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
