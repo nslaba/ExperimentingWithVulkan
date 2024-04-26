@@ -75,7 +75,7 @@ private:
 	vk::Instance instance;
 	vk::DebugUtilsMessengerEXT debugMessenger;
 	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
-	
+	vk::DispatchLoaderDynamic dldi;
 
 	// logical device
 	vk::Device logicalDevice;
@@ -302,25 +302,25 @@ private:
 		if (!enableValidationLayers) return;
 
 		
-
-
-		//vk::DispatchLoaderDynamic dldi(instance);
+		//dldi.init(instance);
 		//auto createDebugUtilsMessengerEXT = dldi.get(vk::Instance::createDebugUtilsMessengerEXT);
+		
+		
+		//vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+		//createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+		//createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+		//createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+		//createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
+		//createInfo.pUserData = nullptr;
 		//
-		//if (createDebugUtilsMessengerEXT) {
-		//	vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-		//	createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
-		//	createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-		//	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-		//	createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
-		//	createInfo.pUserData = nullptr;
-		//
-		//	// The vk::DispatchLoaderDynamic is passed as the last argument to the function.
-		//	vk::Result result = createDebugUtilsMessengerEXT(instance, &createInfo, nullptr, debugMessenger, dldi);
-		//	if (result != vk::Result::eSuccess) {
-		//		throw std::runtime_error("Failed to create debug utils messenger.");
-		//	}
+		//// The vk::DispatchLoaderDynamic is passed as the last argument to the function.
+		//try {
+		//	debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo, nullptr, dldi);
 		//}
+		//catch (vk::SystemError& err) {
+		//	throw std::runtime_error("Failed to create debug messenger" + std::string(err.what()));
+		//}
+		
 	}
 
 	
@@ -1129,6 +1129,9 @@ private:
 	}
 
 	void cleanup() {
+		if (enableValidationLayers) {
+			//instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr, dldi);
+		}		
 		logicalDevice.destroySemaphore(imageAvailableSemaphore);
 		logicalDevice.destroySemaphore(renderFinishedSemaphore);
 		logicalDevice.destroyFence(inFlightFence);
