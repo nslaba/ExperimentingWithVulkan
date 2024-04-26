@@ -44,6 +44,19 @@ const bool enableValidationLayers = true;
 #endif
 
 
+// Proxy function to help with debug msg callback
+//vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
+//	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
+//	if (func != nullptr) {
+//		return static_cast<vk::Result>(func(instance.vkInstance(), pCreateInfo, pAllocator, pDebugMessenger);
+//	}
+//	else {
+//		return static_cast<vk::Result>(VK_ERROR_EXTENSION_NOT_PRESENT);
+//	}
+//}
+
+
+
 class HelloTriangleApplication {
 
 public:
@@ -288,12 +301,26 @@ private:
 	void setupDebugMessenger() {
 		if (!enableValidationLayers) return;
 
-		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-		createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
-		createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-		createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-		createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
-		createInfo.pUserData = nullptr;
+		
+
+
+		//vk::DispatchLoaderDynamic dldi(instance);
+		//auto createDebugUtilsMessengerEXT = dldi.get(vk::Instance::createDebugUtilsMessengerEXT);
+		//
+		//if (createDebugUtilsMessengerEXT) {
+		//	vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+		//	createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+		//	createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+		//	createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+		//	createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
+		//	createInfo.pUserData = nullptr;
+		//
+		//	// The vk::DispatchLoaderDynamic is passed as the last argument to the function.
+		//	vk::Result result = createDebugUtilsMessengerEXT(instance, &createInfo, nullptr, debugMessenger, dldi);
+		//	if (result != vk::Result::eSuccess) {
+		//		throw std::runtime_error("Failed to create debug utils messenger.");
+		//	}
+		//}
 	}
 
 	
