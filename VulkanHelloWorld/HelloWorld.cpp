@@ -951,6 +951,7 @@ private:
 
 		vk::FenceCreateInfo fenceInfo{};
 		fenceInfo.sType = vk::StructureType::eFenceCreateInfo;
+		fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled; // So that the first frame doesn't halt the fence indefinitely
 
 		try {
 			imageAvailableSemaphore = logicalDevice.createSemaphore(semaphoreInfo);
@@ -963,6 +964,40 @@ private:
 	}
 
 	void drawFrame() {
+		// wait until previous frame has finished
+		assert(logicalDevice.waitForFences(1, &inFlightFence, vk::True, UINT64_MAX) == vk::Result::eSuccess); // 64 bit unsigned it is max time out
+		// manually reset fence after waiting
+		assert(logicalDevice.resetFences(1, &inFlightFence) == vk::Result::eSuccess);
+		
+		// acquire image from swap chain
+		uint32_t imageIndex;
+		assert(logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex)== vk::Result::eSuccess); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
+		
+		commandBuffer.reset();
+
+		recordCommandBuffer(commandBuffer, imageIndex);
+		
+		// Queue submission and synchronization
+		//vk::SubmitInfo submitInfo{};
+		//submitInfo.sType = vk::StructureType::eSubmitInfo;
+		//
+		//vk::Semaphore waitSemaphores[] = { imageAvailableSemaphore };
+		//vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput }; // the stage of the pipeline to wait in
+		//submitInfo.waitSemaphoreCount = 1;
+		//submitInfo.pWaitSemaphores = waitSemaphores;
+		//submitInfo.pWaitDstStageMask = waitStages;
+		//submitInfo.commandBufferCount = 1;
+		//submitInfo.pCommandBuffers = &commandBuffer;
+		//vk::Semaphore signalSemaphores[] = { renderFinishedSemaphore };
+		//submitInfo.signalSemaphoreCount = 1;
+		//submitInfo.pSignalSemaphores = signalSemaphores;
+		//
+		//try {
+		//	assert(graphicsQueue.submit(1, &submitInfo, inFlightFence)== vk::Result::eSuccess);
+		//}
+		//catch (const vk::SystemError& err) {
+		//	throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
+		//}
 
 	}
 
