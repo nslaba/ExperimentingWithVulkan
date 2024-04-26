@@ -32,6 +32,18 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
+// Validation layers
+const std::vector<const char*> validationLayers = {
+	"VK_LAYER_KHRONOS_validation"
+};
+
+#ifdef NDEBUG
+const bool enableValidationLayers = false;
+#else
+const bool enableValidationLayers = true;
+#endif
+
+
 class HelloTriangleApplication {
 
 public:
@@ -48,14 +60,9 @@ private:
 	
 	GLFWwindow* window;
 	vk::Instance instance;
+	vk::DebugUtilsMessengerEXT debugMessenger;
 	vk::PhysicalDevice physicalDevice = VK_NULL_HANDLE;
 	
-	// validation layers
-#ifdef NDEBUG
-	const bool enableValidationLayers = true;
-#else
-	const bool enableValidationLayers = false;
-#endif
 
 	// logical device
 	vk::Device logicalDevice;
@@ -139,6 +146,9 @@ private:
 		// 1. INIT
 		createInstance();
 
+		// DEBUGGING
+		setupDebugMessenger();
+
 		// 2. Create Surface
 		createSurface();
 
@@ -172,9 +182,71 @@ private:
 		// 12. Create Synhronization Objects
 		createSyncObjects();
 	}
+
+	// validation layers
+	// checks if all the requested layers are available
+	bool checkValidationLayerSupport() {
+		uint32_t layerCount;
+		assert(vk::enumerateInstanceLayerProperties(&layerCount, nullptr) == vk::Result::eSuccess); // lists all available layers
+
+		std::vector<vk::LayerProperties> availableLayers(layerCount);
+		assert(vk::enumerateInstanceLayerProperties(&layerCount, availableLayers.data()) == vk::Result::eSuccess);
+
+
+		// check if all the layers exist
+		for (const char* layerName : validationLayers) {
+			bool layerFound = false;
+
+			for (const auto& layerProperties : availableLayers) {
+				if (strcmp(layerName, layerProperties.layerName) == 0) {
+					layerFound = true;
+					break;
+				}
+			}
+
+			if (!layerFound) {
+				return false;
+			}
+		}
+
+		
+	}
+
+	// validation layer callback
+	std::vector<const char*> getRequiredExtensions() {
+		uint32_t glfwExtensionCount = 0;
+		const char** glfwExtensions;
+		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+		if (enableValidationLayers) {
+			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+		}
+
+		return extensions;
+	}
+
+	static VKAPI_ATTR vk::Bool32 debugCallback(
+		vk::DebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+		vk::DebugUtilsMessageTypeFlagsEXT messageType,
+		const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData,
+		void* pUserData) 
+	{
+		std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+		return vk::False;
+	}
+
 	
 	/* 1. INIT VULKAN */
 	void createInstance() {
+
+		// validation layers
+		if (enableValidationLayers && !checkValidationLayerSupport())
+		{
+			throw std::runtime_error("validation layers requested, but not available!");
+		}
+
 		vk::ApplicationInfo appInfo{};
 		appInfo.sType = vk::StructureType::eApplicationInfo;
 		appInfo.pApplicationName = "Hello Triangle";
@@ -186,16 +258,24 @@ private:
 		createInfo.sType = vk::StructureType::eInstanceCreateInfo;
 		createInfo.pApplicationInfo = &appInfo;
 
+		// validation layers
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			createInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
+
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensions;
 
 		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-		createInfo.enabledExtensionCount = glfwExtensionCount;
-		createInfo.ppEnabledExtensionNames = glfwExtensions;
-
-		createInfo.enabledLayerCount = 0;
-
+		auto extensions = getRequiredExtensions();
+		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+		createInfo.ppEnabledExtensionNames = extensions.data();
+		
 		//vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
 
 		// create instance && throw run time error if unsuccessful
@@ -203,6 +283,19 @@ private:
 			throw std::runtime_error("failed to create instance!");
 		}
 	}
+
+	// DEBUGGING -- debug messenger setup
+	void setupDebugMessenger() {
+		if (!enableValidationLayers) return;
+
+		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+		createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+		createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
+		createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+		createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
+		createInfo.pUserData = nullptr;
+	}
+
 	
 	/* 2. Create Surface (vulkan object) */
 	void createSurface()
@@ -561,7 +654,7 @@ private:
 
 			// create image view
 			try {
-				logicalDevice.createImageView(createInfo);
+				swapChainImageViews[i] = logicalDevice.createImageView(createInfo);
 			}
 			catch (const vk::SystemError& err){
 				throw std::runtime_error("Failed to create Image View!");
@@ -978,33 +1071,33 @@ private:
 		recordCommandBuffer(commandBuffer, imageIndex);
 		
 		// Queue submission and synchronization
-		//vk::SubmitInfo submitInfo{};
-		//submitInfo.sType = vk::StructureType::eSubmitInfo;
-		//
-		//vk::Semaphore waitSemaphores[] = { imageAvailableSemaphore };
-		//vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput }; // the stage of the pipeline to wait in
-		//submitInfo.waitSemaphoreCount = 1;
-		//submitInfo.pWaitSemaphores = waitSemaphores;
-		//submitInfo.pWaitDstStageMask = waitStages;
-		//submitInfo.commandBufferCount = 1;
-		//submitInfo.pCommandBuffers = &commandBuffer;
-		//vk::Semaphore signalSemaphores[] = { renderFinishedSemaphore };
-		//submitInfo.signalSemaphoreCount = 1;
-		//submitInfo.pSignalSemaphores = signalSemaphores;
-		//
-		//try {
-		//	assert(graphicsQueue.submit(1, &submitInfo, inFlightFence)== vk::Result::eSuccess);
-		//}
-		//catch (const vk::SystemError& err) {
-		//	throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
-		//}
+		vk::SubmitInfo submitInfo{};
+		submitInfo.sType = vk::StructureType::eSubmitInfo;
+		
+		vk::Semaphore waitSemaphores[] = { imageAvailableSemaphore };
+		vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput }; // the stage of the pipeline to wait in
+		submitInfo.waitSemaphoreCount = 1;
+		submitInfo.pWaitSemaphores = waitSemaphores;
+		submitInfo.pWaitDstStageMask = waitStages;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+		vk::Semaphore signalSemaphores[] = { renderFinishedSemaphore };
+		submitInfo.signalSemaphoreCount = 1;
+		submitInfo.pSignalSemaphores = signalSemaphores;
+		
+		try {
+			assert(graphicsQueue.submit(1, &submitInfo, inFlightFence)== vk::Result::eSuccess);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
+		}
 
 	}
 
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
-			drawFrame();
+			//drawFrame();
 		}
 	}
 
