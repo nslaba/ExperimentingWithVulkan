@@ -45,15 +45,25 @@ const bool enableValidationLayers = true;
 
 
 // Proxy function to help with debug msg callback
-//vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
-//	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
-//	if (func != nullptr) {
-//		return static_cast<vk::Result>(func(instance.vkInstance(), pCreateInfo, pAllocator, pDebugMessenger);
-//	}
-//	else {
-//		return static_cast<vk::Result>(VK_ERROR_EXTENSION_NOT_PRESENT);
-//	}
-//}
+vk::Result CreateDebugUtilsMessengerEXT(vk::Instance instance, const vk::DebugUtilsMessengerCreateInfoEXT* pCreateInfo, const vk::AllocationCallbacks* pAllocator, vk::DebugUtilsMessengerEXT* pDebugMessenger) {
+	auto func = (PFN_vkCreateDebugUtilsMessengerEXT)instance.getProcAddr("vkCreateDebugUtilsMessengerEXT");
+	if (func != nullptr) {
+		VkResult result = func(instance, &pCreateInfo->operator const VkDebugUtilsMessengerCreateInfoEXT & (), &pAllocator->operator const VkAllocationCallbacks & (), reinterpret_cast<VkDebugUtilsMessengerEXT*>(pDebugMessenger));
+		return static_cast<vk::Result>(result);
+	}
+	else {
+		return vk::Result::eErrorExtensionNotPresent;
+	}
+}
+
+void DestroyDebugUtilsMessengerEXT(vk::Instance instance, vk::DebugUtilsMessengerEXT debugMessenger, const vk::AllocationCallbacks* pAllocator) {
+	auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)instance.getProcAddr("vkDestroyDebugUtilsMessengerEXT");
+
+	if (func != nullptr) {
+		func(instance, debugMessenger, &pAllocator->operator const VkAllocationCallbacks &());
+	}
+
+}
 
 
 
@@ -306,21 +316,17 @@ private:
 		//auto createDebugUtilsMessengerEXT = dldi.get(vk::Instance::createDebugUtilsMessengerEXT);
 		
 		
-		//vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
-		//createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
-		//createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
-		//createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
-		//createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
-		//createInfo.pUserData = nullptr;
-		//
-		//// The vk::DispatchLoaderDynamic is passed as the last argument to the function.
-		//try {
-		//	debugMessenger = instance.createDebugUtilsMessengerEXT(createInfo, nullptr, dldi);
-		//}
-		//catch (vk::SystemError& err) {
-		//	throw std::runtime_error("Failed to create debug messenger" + std::string(err.what()));
-		//}
+		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+		createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
+		createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError; // what you'd like the call back to be called for
+		createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
+		createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
+		createInfo.pUserData = nullptr;
 		
+		if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to set up debug messenger");
+		}
+				
 	}
 
 	
@@ -1130,7 +1136,7 @@ private:
 
 	void cleanup() {
 		if (enableValidationLayers) {
-			//instance.destroyDebugUtilsMessengerEXT(debugMessenger, nullptr, dldi);
+			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
 		}		
 		logicalDevice.destroySemaphore(imageAvailableSemaphore);
 		logicalDevice.destroySemaphore(renderFinishedSemaphore);
