@@ -719,6 +719,15 @@ private:
 		subpass.colorAttachmentCount = 1;
 		subpass.pColorAttachments = &colorAttachmentRef;
 
+		// subpass dependency
+		vk::SubpassDependency dependency{};
+		dependency.srcSubpass = VK_SUBPASS_EXTERNAL; // refers to the implicit subpass before or after the render pass depending on whether it is specified in srcSubpass or dstSubpass.
+		dependency.dstSubpass = 0; //index of subpass. dstSubpass must always be higher than srcSubpass to prevent cycles in the dependency graph.
+		dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		dependency.srcAccessMask = vk::AccessFlagBits(0);
+		dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+		dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
+
 		// create the render pass
 		vk::RenderPassCreateInfo renderPassInfo{};
 		renderPassInfo.sType = vk::StructureType::eRenderPassCreateInfo;
@@ -726,6 +735,8 @@ private:
 		renderPassInfo.pAttachments = &colorAttachment;
 		renderPassInfo.subpassCount = 1;
 		renderPassInfo.pSubpasses = &subpass;
+		renderPassInfo.dependencyCount = 1;
+		renderPassInfo.pDependencies = &dependency;
 
 		try {
 			renderPass = logicalDevice.createRenderPass(renderPassInfo);
@@ -1125,12 +1136,26 @@ private:
 			throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
 		}
 
+		// submit result back to the swap chain
+		vk::PresentInfoKHR presentInfo{};
+		presentInfo.sType = vk::StructureType::ePresentInfoKHR;
+		presentInfo.waitSemaphoreCount = 1;
+		presentInfo.pWaitSemaphores = signalSemaphores;
+
+		vk::SwapchainKHR swapChains[] = { swapChain };
+		presentInfo.swapchainCount = 1;
+		presentInfo.pSwapchains = swapChains;
+		presentInfo.pImageIndices = &imageIndex;
+		presentInfo.pResults = nullptr;
+
+		assert(presentQueue.presentKHR(presentInfo) == vk::Result::eSuccess);
+
 	}
 
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
-			//drawFrame();
+			drawFrame();
 		}
 	}
 
