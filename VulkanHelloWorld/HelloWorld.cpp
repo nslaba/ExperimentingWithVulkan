@@ -1157,6 +1157,7 @@ private:
 			glfwPollEvents();
 			drawFrame();
 		}
+		logicalDevice.waitIdle();
 	}
 
 	void cleanup() {
