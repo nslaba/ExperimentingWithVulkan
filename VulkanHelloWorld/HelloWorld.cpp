@@ -1220,13 +1220,6 @@ private:
 			std::cerr << "Caught an unecognized exception" << std::endl;
 		}
 
-		//if (resultPresent == vk::Result::eErrorOutOfDateKHR || resultPresent == vk::Result::eSuboptimalKHR) {
-		//	recreateSwapChain();
-		//}
-		//else if (resultPresent != vk::Result::eSuccess) {
-		//	throw std::runtime_error("Failed to present swap chain image!");
-		//}
-
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 
