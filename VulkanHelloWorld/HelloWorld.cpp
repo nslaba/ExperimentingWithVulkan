@@ -601,6 +601,29 @@ private:
 
 	// 5. Create Swap Chain
 
+	void recreateSwapChain() {
+		logicalDevice.waitIdle(); // shouldn't touch resources that may still be in use.
+		
+		cleanupSwapChain();
+
+		createSwapChain();
+		createImageViews();
+		createFramebuffers();
+	}
+
+	void cleanupSwapChain() {
+		for (auto framebuffer : swapChainFramebuffers) {
+		for (auto framebuffer : swapChainFramebuffers) 
+			logicalDevice.destroyFramebuffer(framebuffer);
+		}
+		for (auto imageView : swapChainImageViews)
+		{
+			logicalDevice.destroyImageView(imageView);
+		}
+
+		logicalDevice.destroySwapchainKHR(swapChain);
+	}
+
 	void createSwapChain()
 	{
 		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice);
@@ -1121,8 +1144,22 @@ private:
 		
 		// acquire image from swap chain
 		uint32_t imageIndex;
-		assert(logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex) == vk::Result::eSuccess); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
-		
+		vk::Result result;
+		try {
+			result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to acquire swap chain image: " + std::string(err.what()));
+		}
+
+		if (result == vk::Result::eErrorOutOfDateKHR) { // swap chain becomes incompatible with the surface and can no longer be used for rendering. Usually after window resize
+			recreateSwapChain();
+			return;
+		}
+		else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) { // swap chain can be used for surface, but the surface properties don't match
+			throw std::runtime_error("Failed to acquire swap chain image!");
+		}
+
 		commandBuffers[currentFrame].reset();
 
 		recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
@@ -1161,7 +1198,19 @@ private:
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr;
 
-		assert(presentQueue.presentKHR(presentInfo) == vk::Result::eSuccess);
+		try {
+			result = presentQueue.presentKHR(presentInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to present swap chain image! " + std::string(err.what()));
+		}
+
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+			recreateSwapChain();
+		}
+		else if (result != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to present swap chain image!");
+		}
 
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
@@ -1175,32 +1224,26 @@ private:
 	}
 
 	void cleanup() {
-		if (enableValidationLayers) {
-			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-		}
-		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++ ) {
+		// clean up swap chains
+		cleanupSwapChain();
+		
+		logicalDevice.destroyPipeline(graphicsPipeline);
+		logicalDevice.destroyPipelineLayout(pipelineLayout);
+		logicalDevice.destroyRenderPass(renderPass);
+		
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
 			logicalDevice.destroySemaphore(imageAvailableSemaphores[i]);
 			logicalDevice.destroySemaphore(renderFinishedSemaphores[i]);
 			logicalDevice.destroyFence(inFlightFences[i]);
 		}
-		
+
 		logicalDevice.destroyCommandPool(commandPool);
 
-		for (auto framebuffer : swapChainFramebuffers) {
-			logicalDevice.destroyFramebuffer(framebuffer);
-		}
-		logicalDevice.destroyPipeline(graphicsPipeline);
-		logicalDevice.destroyPipelineLayout(pipelineLayout);
-		logicalDevice.destroyRenderPass(renderPass);
-		// clean up image views
-		for (auto imageView : swapChainImageViews)
-		{
-			logicalDevice.destroyImageView(imageView);
-		}
-
-		logicalDevice.destroySwapchainKHR(swapChain);
-
 		logicalDevice.destroy();
+
+		if (enableValidationLayers) {
+			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+		}
 
 		instance.destroySurfaceKHR(surface, nullptr);
 
