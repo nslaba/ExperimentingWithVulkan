@@ -1139,18 +1139,13 @@ private:
 	void drawFrame() {
 		// wait until previous frame has finished
 		assert(logicalDevice.waitForFences(1, &inFlightFences[currentFrame], vk::True, UINT64_MAX) == vk::Result::eSuccess); // 64 bit unsigned it is max time out
-		// manually reset fence after waiting
-		assert(logicalDevice.resetFences(1, &inFlightFences[currentFrame]) == vk::Result::eSuccess);
 		
 		// acquire image from swap chain
 		uint32_t imageIndex;
 		vk::Result result;
-		try {
-			result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
-		}
-		catch (const vk::SystemError& err) {
-			throw std::runtime_error("Failed to acquire swap chain image: " + std::string(err.what()));
-		}
+		
+		result = logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
+		
 
 		if (result == vk::Result::eErrorOutOfDateKHR) { // swap chain becomes incompatible with the surface and can no longer be used for rendering. Usually after window resize
 			recreateSwapChain();
@@ -1159,6 +1154,9 @@ private:
 		else if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) { // swap chain can be used for surface, but the surface properties don't match
 			throw std::runtime_error("Failed to acquire swap chain image!");
 		}
+
+		// manually reset fence after waiting
+		assert(logicalDevice.resetFences(1, &inFlightFences[currentFrame]) == vk::Result::eSuccess);
 
 		commandBuffers[currentFrame].reset();
 
@@ -1199,18 +1197,35 @@ private:
 		presentInfo.pResults = nullptr;
 
 		try {
-			result = presentQueue.presentKHR(presentInfo);
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to present swap chain image! " + std::string(err.what()));
-		}
+			vk::Result resultPresent;
+			resultPresent = presentQueue.presentKHR(presentInfo);
 
-		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+			if (resultPresent == vk::Result::eSuboptimalKHR) {
+				recreateSwapChain();
+			}
+		}
+		catch (const vk::OutOfDateKHRError& err )
+		{
 			recreateSwapChain();
 		}
-		else if (result != vk::Result::eSuccess) {
-			throw std::runtime_error("Failed to present swap chain image!");
+		catch (const vk::SystemError& err) {
+			std::cerr << "Vulkan system error: " << err.what() << std::endl;
 		}
+		
+		catch (const std::exception& e) {
+			std::cerr << "Failed to present swap chain image: " << e.what() << std::endl;
+			throw;
+		}
+		catch (...) {
+			std::cerr << "Caught an unecognized exception" << std::endl;
+		}
+
+		//if (resultPresent == vk::Result::eErrorOutOfDateKHR || resultPresent == vk::Result::eSuboptimalKHR) {
+		//	recreateSwapChain();
+		//}
+		//else if (resultPresent != vk::Result::eSuccess) {
+		//	throw std::runtime_error("Failed to present swap chain image!");
+		//}
 
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
