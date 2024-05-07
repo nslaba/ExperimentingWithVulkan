@@ -32,6 +32,8 @@
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
+const int MAX_FRAMES_IN_FLIGHT = 2; //to allow multiple frames to be in flight at once
+
 // Validation layers
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -108,14 +110,16 @@ private:
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
 	vk::CommandPool commandPool;
-	vk::CommandBuffer commandBuffer;
+	std::vector<vk::CommandBuffer> commandBuffers;
 
 	// Synchronization
-	vk::Semaphore imageAvailableSemaphore;
-	vk::Semaphore renderFinishedSemaphore;
-	vk::Fence inFlightFence;
+	std::vector<vk::Semaphore> imageAvailableSemaphores;
+	std::vector<vk::Semaphore> renderFinishedSemaphores;
+	std::vector<vk::Fence> inFlightFences;
 	
-	
+	// Frames
+	uint32_t currentFrame = 0;
+
 	/* Member structs */
 	
 	// vulkan creation
@@ -200,7 +204,7 @@ private:
 		createCommandPool();
 
 		// 11. Create Command Buffer
-		createCommandBuffer();
+		createCommandBuffers();
 
 		// 12. Create Synhronization Objects
 		createSyncObjects();
@@ -1004,16 +1008,17 @@ private:
 	}
 	
 	// 11. Create Command Buffer
-	void createCommandBuffer() {
+	void createCommandBuffers() {
+		commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
 		vk::CommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
 		allocInfo.commandPool = commandPool;
 		allocInfo.level = vk::CommandBufferLevel::ePrimary;
-		allocInfo.commandBufferCount = 1; // if primary or secondary
+		allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size()); // if primary or secondary
 
 		try {
-			std::vector<vk::CommandBuffer, std::allocator<vk::CommandBuffer>> result = logicalDevice.allocateCommandBuffers(allocInfo);
-			commandBuffer = result[0];
+			commandBuffers = logicalDevice.allocateCommandBuffers(allocInfo);			
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to create a command buffers!" + std::string(err.what()));
@@ -1083,6 +1088,10 @@ private:
 
 	// 12. Create Synhronization Objects
 	void createSyncObjects() {
+		imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+		renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+		inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
 		vk::SemaphoreCreateInfo semaphoreInfo{};
 		semaphoreInfo.sType = vk::StructureType::eSemaphoreCreateInfo;
 
@@ -1090,47 +1099,51 @@ private:
 		fenceInfo.sType = vk::StructureType::eFenceCreateInfo;
 		fenceInfo.flags = vk::FenceCreateFlagBits::eSignaled; // So that the first frame doesn't halt the fence indefinitely
 
-		try {
-			imageAvailableSemaphore = logicalDevice.createSemaphore(semaphoreInfo);
-			renderFinishedSemaphore = logicalDevice.createSemaphore(semaphoreInfo);
-			inFlightFence = logicalDevice.createFence(fenceInfo);
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			try {
+				imageAvailableSemaphores[i] = logicalDevice.createSemaphore(semaphoreInfo);
+				renderFinishedSemaphores[i] = logicalDevice.createSemaphore(semaphoreInfo);
+				inFlightFences[i] = logicalDevice.createFence(fenceInfo);
+			}
+			catch (const vk::SystemError& err) {
+				throw std::runtime_error("Failed to create synchronization objects for a frame!" + std::string(err.what()));
+			}
 		}
-		catch (const vk::SystemError& err) {
-			throw std::runtime_error("Failed to create synchronization objects" + std::string(err.what()));
-		}
+
+		
 	}
 
 	void drawFrame() {
 		// wait until previous frame has finished
-		assert(logicalDevice.waitForFences(1, &inFlightFence, vk::True, UINT64_MAX) == vk::Result::eSuccess); // 64 bit unsigned it is max time out
+		assert(logicalDevice.waitForFences(1, &inFlightFences[currentFrame], vk::True, UINT64_MAX) == vk::Result::eSuccess); // 64 bit unsigned it is max time out
 		// manually reset fence after waiting
-		assert(logicalDevice.resetFences(1, &inFlightFence) == vk::Result::eSuccess);
+		assert(logicalDevice.resetFences(1, &inFlightFences[currentFrame]) == vk::Result::eSuccess);
 		
 		// acquire image from swap chain
 		uint32_t imageIndex;
-		assert(logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex)== vk::Result::eSuccess); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
+		assert(logicalDevice.acquireNextImageKHR(swapChain, UINT64_MAX, imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex) == vk::Result::eSuccess); // 3rd param is timeout in nanoseconds -- using the 64 bit unsigned int means timeout is disabled
 		
-		commandBuffer.reset();
+		commandBuffers[currentFrame].reset();
 
-		recordCommandBuffer(commandBuffer, imageIndex);
+		recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 		
 		// Queue submission and synchronization
 		vk::SubmitInfo submitInfo{};
 		submitInfo.sType = vk::StructureType::eSubmitInfo;
 		
-		vk::Semaphore waitSemaphores[] = { imageAvailableSemaphore };
+		vk::Semaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame]};
 		vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput }; // the stage of the pipeline to wait in
 		submitInfo.waitSemaphoreCount = 1;
 		submitInfo.pWaitSemaphores = waitSemaphores;
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
-		vk::Semaphore signalSemaphores[] = { renderFinishedSemaphore };
+		submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
+		vk::Semaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame]};
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = signalSemaphores;
 		
 		try {
-			assert(graphicsQueue.submit(1, &submitInfo, inFlightFence)== vk::Result::eSuccess);
+			assert(graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]) == vk::Result::eSuccess);
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
@@ -1150,6 +1163,7 @@ private:
 
 		assert(presentQueue.presentKHR(presentInfo) == vk::Result::eSuccess);
 
+		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 
 	void mainLoop() {
@@ -1163,10 +1177,13 @@ private:
 	void cleanup() {
 		if (enableValidationLayers) {
 			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-		}		
-		logicalDevice.destroySemaphore(imageAvailableSemaphore);
-		logicalDevice.destroySemaphore(renderFinishedSemaphore);
-		logicalDevice.destroyFence(inFlightFence);
+		}
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++ ) {
+			logicalDevice.destroySemaphore(imageAvailableSemaphores[i]);
+			logicalDevice.destroySemaphore(renderFinishedSemaphores[i]);
+			logicalDevice.destroyFence(inFlightFences[i]);
+		}
+		
 		logicalDevice.destroyCommandPool(commandPool);
 
 		for (auto framebuffer : swapChainFramebuffers) {
