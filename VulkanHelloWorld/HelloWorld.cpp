@@ -116,9 +116,12 @@ private:
 	std::vector<vk::Semaphore> imageAvailableSemaphores;
 	std::vector<vk::Semaphore> renderFinishedSemaphores;
 	std::vector<vk::Fence> inFlightFences;
+	bool framebufferResized = false;
 	
 	// Frames
 	uint32_t currentFrame = 0;
+
+
 
 	/* Member structs */
 	
@@ -165,8 +168,14 @@ private:
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 		window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan window", nullptr, nullptr);
+		glfwSetWindowUserPointer(window, this);
+		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 	}
 
+	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
+		auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+		app->framebufferResized = true;
+	}
 
 	void initVulkan() {
 
@@ -602,6 +611,14 @@ private:
 	// 5. Create Swap Chain
 
 	void recreateSwapChain() {
+		// handle minimization
+		int width = 0, height = 0;
+		glfwGetFramebufferSize(window, &width, &height);
+		while (width == 0 || height == 0) {
+			glfwGetFramebufferSize(window, &width, &height);
+			glfwWaitEvents();
+		}
+
 		logicalDevice.waitIdle(); // shouldn't touch resources that may still be in use.
 		
 		cleanupSwapChain();
@@ -1200,12 +1217,14 @@ private:
 			vk::Result resultPresent;
 			resultPresent = presentQueue.presentKHR(presentInfo);
 
-			if (resultPresent == vk::Result::eSuboptimalKHR) {
+			if (resultPresent == vk::Result::eSuboptimalKHR || framebufferResized) {
+				framebufferResized = false;
 				recreateSwapChain();
 			}
 		}
 		catch (const vk::OutOfDateKHRError& err )
 		{
+			framebufferResized = false;
 			recreateSwapChain();
 		}
 		catch (const vk::SystemError& err) {
