@@ -26,7 +26,18 @@
 #include <sstream>
 #include <stdexcept>
 
+#include <glm.hpp> // library used for lin alg related types
 
+struct Vertex {
+	glm::vec2 pos;
+	glm::vec3 color;
+};
+
+std::vector<Vertex> vertices = {
+	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f} },
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+}; // This is known as 'interleaving vertex attributes'
 
 
 const uint32_t WIDTH = 800;
