@@ -27,10 +27,31 @@
 #include <stdexcept>
 
 #include <glm.hpp> // library used for lin alg related types
+#include <array>
 
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
+
+	//  mem function to populate input binding description structure
+	static vk::VertexInputBindingDescription getBindingDescription() {
+		vk::VertexInputBindingDescription bindingDescription{}; // describes at which rate to load data from memory throughout the vertices
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = vk::VertexInputRate::eVertex;
+
+		return bindingDescription;
+	}
+
+	static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions() {
+		std::array<vk::VertexInputAttributeDescription, 2> attributeDescription;
+		attributeDescription[0].binding = 0;
+		attributeDescription[0].location = 0;
+		attributeDescription[0].format = vk::Format::eR32G32B32A32Sfloat;
+		attributeDescription[0].offset = offsetof(Vertex, pos);
+		return attributeDescription;
+	}
+
 };
 
 std::vector<Vertex> vertices = {
