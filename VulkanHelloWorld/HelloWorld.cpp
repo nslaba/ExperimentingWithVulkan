@@ -157,7 +157,7 @@ private:
 	// Frames
 	uint32_t currentFrame = 0;
 
-
+	vk::Buffer vertexBuffer;
 
 	/* Member structs */
 	
@@ -247,6 +247,9 @@ private:
 
 		// 10. Create Command pool
 		createCommandPool();
+
+		// 11. Create Vertex Buffer
+		createVertexBuffer();
 
 		// 11. Create Command Buffer
 		createCommandBuffers();
@@ -1087,8 +1090,28 @@ private:
 			throw std::runtime_error("Failed to create command pool!");
 		}
 	}
+
+	// 11. Create Vertex Buffer
+	void createVertexBuffer() {
+
+		vk::BufferCreateInfo bufferInfo{};
+		bufferInfo.sType = vk::StructureType::eBufferCreateInfo;
+		bufferInfo.size - static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
+		bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+		bufferInfo.sharingMode = vk::SharingMode::eExclusive;
+
+		try {
+			logicalDevice.createBuffer(bufferInfo, nullptr, &vertexBuffer);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create vertex buffer" + std::string(err.what()));
+		}
+
+	}
+
+
 	
-	// 11. Create Command Buffer
+	// 12. Create Command Buffer
 	void createCommandBuffers() {
 		commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1167,7 +1190,7 @@ private:
 
 	}
 
-	// 12. Create Synhronization Objects
+	// 13. Create Synhronization Objects
 	void createSyncObjects() {
 		imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
