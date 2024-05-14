@@ -157,6 +157,8 @@ private:
 	// Frames
 	uint32_t currentFrame = 0;
 
+	// vertex buffer
+	vk::DeviceMemory vertexBufferMemory;
 	vk::Buffer vertexBuffer;
 
 	/* Member structs */
@@ -1101,12 +1103,56 @@ private:
 		bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 
 		try {
-			logicalDevice.createBuffer(bufferInfo, nullptr, &vertexBuffer);
+			vertexBuffer = logicalDevice.createBuffer(bufferInfo, nullptr);
 		}
 		catch (vk::SystemError& err) {
 			throw std::runtime_error("Failed to create vertex buffer" + std::string(err.what()));
 		}
 
+		// assign mem to vertex buffer
+		vk::MemoryRequirements memRequirements;
+		memRequirements = logicalDevice.getBufferMemoryRequirements(vertexBuffer);
+
+		// mem allocation
+		vk::MemoryAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eMemoryAllocateInfo;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = findMemotyType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+
+		try {
+			vertexBufferMemory = logicalDevice.allocateMemory(allocInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create vertex buffer memory!");
+		}
+
+		// bind mem with buffer
+		logicalDevice.bindBufferMemory(vertexBuffer, vertexBufferMemory, 0);
+
+		// map memory
+		void* data = nullptr;
+		try {
+			data = logicalDevice.mapMemory(vertexBufferMemory, 0, bufferInfo.size, vk::MemoryMapFlags());
+
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to map memory!" + std::string(err.what()));
+		}
+		memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+		logicalDevice.unmapMemory(vertexBufferMemory);
+	}
+
+	uint32_t findMemotyType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+		vk::PhysicalDeviceMemoryProperties memProperties;
+		memProperties = physicalDevice.getMemoryProperties();
+
+		for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+			if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+				return i;
+			}
+		}
+
+		throw std::runtime_error("failed to find suitable memory type!");
 	}
 
 
@@ -1162,6 +1208,16 @@ private:
 		// Drawing commands
 		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, graphicsPipeline);
 
+		vk::Buffer vertexBuffers[] = { vertexBuffer };
+		vk::DeviceSize offsets[] = { 0 };
+		try {
+			commandBuffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to bind vertex buffer" + std::string(err.what()));
+		}
+
+		
 		// handle dynamic viewport and scissor state
 		vk::Viewport viewport{};
 		viewport.x = 0.0f;
@@ -1177,7 +1233,13 @@ private:
 		scissor.extent = swapChainExtent;
 		commandBuffer.setScissor(0, 1, &scissor);
 
-		commandBuffer.draw(3, 1, 0, 0); // vertex count (3 vertices to draw), instance count, first vertex (offset into the vertex buffer), first instance (offset for instanced rendering)
+		//commandBuffer.draw(3, 1, 0, 0); // vertex count (3 vertices to draw), instance count, first vertex (offset into the vertex buffer), first instance (offset for instanced rendering)
+		try {
+			commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to draw!" + std::string(err.what()));
+		}
 
 		commandBuffer.endRenderPass();
 
@@ -1317,7 +1379,9 @@ private:
 	void cleanup() {
 		// clean up swap chains
 		cleanupSwapChain();
-		
+
+		logicalDevice.destroyBuffer(vertexBuffer);
+		logicalDevice.freeMemory(vertexBufferMemory);
 		logicalDevice.destroyPipeline(graphicsPipeline);
 		logicalDevice.destroyPipelineLayout(pipelineLayout);
 		logicalDevice.destroyRenderPass(renderPass);
