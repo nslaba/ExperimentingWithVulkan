@@ -49,6 +49,10 @@ struct Vertex {
 		attributeDescription[0].location = 0;
 		attributeDescription[0].format = vk::Format::eR32G32B32A32Sfloat;
 		attributeDescription[0].offset = offsetof(Vertex, pos);
+		attributeDescription[1].binding = 0;
+		attributeDescription[1].location = 1;
+		attributeDescription[1].format = vk::Format::eR32G32B32A32Sfloat;
+		attributeDescription[1].offset = offsetof(Vertex, color);
 		return attributeDescription;
 	}
 
@@ -850,11 +854,16 @@ private:
 
 		// Vertex input
 		vk::PipelineVertexInputStateCreateInfo vertexInputInfo{};
+
+		auto bindingDescription = Vertex::getBindingDescription();
+		auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
 		vertexInputInfo.sType = vk::StructureType::ePipelineVertexInputStateCreateInfo;
-		vertexInputInfo.vertexBindingDescriptionCount = 0;
-		vertexInputInfo.pVertexBindingDescriptions = nullptr;
-		vertexInputInfo.vertexAttributeDescriptionCount = 0;
-		vertexInputInfo.pVertexAttributeDescriptions = nullptr;
+		vertexInputInfo.vertexBindingDescriptionCount = 1;
+		vertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+		
 
 
 		// Input Assembly
