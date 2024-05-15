@@ -47,11 +47,11 @@ struct Vertex {
 		std::array<vk::VertexInputAttributeDescription, 2> attributeDescription;
 		attributeDescription[0].binding = 0;
 		attributeDescription[0].location = 0;
-		attributeDescription[0].format = vk::Format::eR32G32B32A32Sfloat;
+		attributeDescription[0].format = vk::Format::eR32G32Sfloat;
 		attributeDescription[0].offset = offsetof(Vertex, pos);
 		attributeDescription[1].binding = 0;
 		attributeDescription[1].location = 1;
-		attributeDescription[1].format = vk::Format::eR32G32B32A32Sfloat;
+		attributeDescription[1].format = vk::Format::eR32G32B32Sfloat;
 		attributeDescription[1].offset = offsetof(Vertex, color);
 		return attributeDescription;
 	}
@@ -1093,12 +1093,16 @@ private:
 		}
 	}
 
+	void createBuffer() {
+
+	}
+
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
 
 		vk::BufferCreateInfo bufferInfo{};
 		bufferInfo.sType = vk::StructureType::eBufferCreateInfo;
-		bufferInfo.size - static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
+		bufferInfo.size = static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
 		bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
 		bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 
