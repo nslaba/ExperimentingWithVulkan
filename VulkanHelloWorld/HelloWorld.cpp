@@ -71,6 +71,12 @@ std::vector<Vertex> vertices = {
 }; // This is known as 'interleaving vertex attributes'
 
 
+struct UniformBufferObject {
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
+};
+
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
 
@@ -149,6 +155,7 @@ private:
 
 	// Pipeline
 	vk::RenderPass renderPass;
+	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
 	vk::CommandPool commandPool;
@@ -250,6 +257,9 @@ private:
 
 		// 7. Create Render Pass
 		createRenderPass();
+
+		// 8. Create Descriptor layout
+		createDescriptorSetLayout();
 
 		// 8. create Graphics Pipeline
 		createGraphicsPipeline();
@@ -841,6 +851,29 @@ private:
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to create Render Pass!");
+		}
+
+	}
+
+	//8. Create Descriptor set layout
+	void createDescriptorSetLayout() {
+		vk::DescriptorSetLayoutBinding uboLayoutBinding{};
+		uboLayoutBinding.binding = 0;
+		uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
+		uboLayoutBinding.descriptorCount = 1;
+		uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+		uboLayoutBinding.pImmutableSamplers = nullptr;
+
+		vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
+		layoutInfo.bindingCount = 1;
+		layoutInfo.pBindings = &uboLayoutBinding;
+
+		try {
+			descriptorSetLayout = logicalDevice.createDescriptorSetLayout(layoutInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create descriptor layout!" + std::string(err.what()));
 		}
 
 	}
