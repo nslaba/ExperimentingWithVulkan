@@ -58,10 +58,16 @@ struct Vertex {
 
 };
 
+// indices to represent the contents of the index buffer
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0 // order of rectangle vertices
+};
+
 std::vector<Vertex> vertices = {
-	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f} },
-	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+	{{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
 }; // This is known as 'interleaving vertex attributes'
 
 
@@ -161,6 +167,10 @@ private:
 	vk::DeviceMemory vertexBufferMemory;
 	vk::Buffer vertexBuffer;
 
+	//index buffer
+	vk::DeviceMemory indexBufferMemory;
+	vk::Buffer indexBuffer;
+
 	/* Member structs */
 	
 	// vulkan creation
@@ -253,10 +263,13 @@ private:
 		// 11. Create Vertex Buffer
 		createVertexBuffer();
 
-		// 11. Create Command Buffer
+		// 12. Create Index Buffer
+		createIndexBuffer();
+
+		// 13. Create Command Buffer
 		createCommandBuffers();
 
-		// 12. Create Synhronization Objects
+		// 14. Create Synhronization Objects
 		createSyncObjects();
 	}
 
@@ -1153,7 +1166,7 @@ private:
 		memcpy(data, vertices.data(), (size_t)bufferSize);
 		logicalDevice.unmapMemory(stagingBufferMemory);
 
-		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, vertexBuffer, vertexBufferMemory);
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
 		
 		copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
@@ -1257,9 +1270,50 @@ private:
 		throw std::runtime_error("failed to find suitable memory type!");
 	}
 
+	// 12. Create index buffer
+	void createIndexBuffer() {
+		
+		vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(sizeof(indices[0]) * indices.size());
+
+		vk::Buffer stagingBuffer;
+		vk::DeviceMemory stagingBufferMemory;
+
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+		
+		// map memory
+		void* data = nullptr;
+
+		try {
+			data = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags()); // mapping creates a link between cpu and gpu memory, but keeping it mapped forever can create contention
+
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to map memory!" + std::string(err.what()));
+		}
+		memcpy(data, indices.data(), (size_t)bufferSize);
+		logicalDevice.unmapMemory(stagingBufferMemory);
+
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, indexBuffer, indexBufferMemory);
+
+		copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+		try {
+			logicalDevice.destroyBuffer(stagingBuffer);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to destroy staging buffer!" + std::string(err.what()));
+		}
+
+		try {
+			logicalDevice.freeMemory(stagingBufferMemory);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to free staging buffer memory!" + std::string(err.what()));
+		}
+	}
 
 	
-	// 12. Create Command Buffer
+	// 13. Create Command Buffer
 	void createCommandBuffers() {
 		commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1319,6 +1373,12 @@ private:
 			throw std::runtime_error("Failed to bind vertex buffer" + std::string(err.what()));
 		}
 
+		try {
+			commandBuffer.bindIndexBuffer(indexBuffer, 0, vk::IndexType::eUint16);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to bind index buffer!" + std::string(err.what()));
+		}
 		
 		// handle dynamic viewport and scissor state
 		vk::Viewport viewport{};
@@ -1337,7 +1397,8 @@ private:
 
 		//commandBuffer.draw(3, 1, 0, 0); // vertex count (3 vertices to draw), instance count, first vertex (offset into the vertex buffer), first instance (offset for instanced rendering)
 		try {
-			commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+			commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+			//commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to draw!" + std::string(err.what()));
@@ -1354,7 +1415,7 @@ private:
 
 	}
 
-	// 13. Create Synhronization Objects
+	// 14. Create Synhronization Objects
 	void createSyncObjects() {
 		imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 		renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1482,6 +1543,8 @@ private:
 		// clean up swap chains
 		cleanupSwapChain();
 
+		logicalDevice.destroyBuffer(indexBuffer);
+		logicalDevice.freeMemory(indexBufferMemory);
 		logicalDevice.destroyBuffer(vertexBuffer);
 		logicalDevice.freeMemory(vertexBufferMemory);
 		logicalDevice.destroyPipeline(graphicsPipeline);
