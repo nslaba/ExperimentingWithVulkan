@@ -1130,21 +1130,118 @@ private:
 
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
+		// use staging buffer as an 'intermediate' between cpu and gpu.
 
 		vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
-		createBuffer(bufferSize, vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, vertexBuffer, vertexBufferMemory);
+
+		vk::Buffer stagingBuffer;
+		vk::DeviceMemory stagingBufferMemory;
+
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+		// note, host visible means visible by cpu
 
 		// map memory
 		void* data = nullptr;
+
 		try {
-			data = logicalDevice.mapMemory(vertexBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
+			data = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags()); // mapping creates a link between cpu and gpu memory, but keeping it mapped forever can create contention
 
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to map memory!" + std::string(err.what()));
 		}
 		memcpy(data, vertices.data(), (size_t)bufferSize);
-		logicalDevice.unmapMemory(vertexBufferMemory);
+		logicalDevice.unmapMemory(stagingBufferMemory);
+
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, vertexBuffer, vertexBufferMemory);
+		
+		copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+
+		try {
+			logicalDevice.destroyBuffer(stagingBuffer);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to destroy staging buffer!" + std::string(err.what()));
+		}
+
+		try {
+			logicalDevice.freeMemory(stagingBufferMemory);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to free staging buffer memory!" + std::string(err.what()));
+		}
+	}
+
+	void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
+	{
+		vk::CommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+		allocInfo.level = vk::CommandBufferLevel::ePrimary;
+		allocInfo.commandPool = commandPool;
+		allocInfo.commandBufferCount = 1;
+
+		vk::CommandBuffer commandBuffer;
+		try {
+			commandBuffer = logicalDevice.allocateCommandBuffers(allocInfo)[0];
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Couldn't allocate command buffer!" + std::string(err.what()));
+		}
+
+		vk::CommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+		try {
+			commandBuffer.begin(beginInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to begin command buffer!" + std::string(err.what()));
+		}
+
+		vk::BufferCopy copyRegion{};
+		copyRegion.srcOffset = 0;
+		copyRegion.dstOffset = 0;
+		copyRegion.size = size;
+		try {
+			commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to transfer data between buffers!" + std::string(err.what()));
+		}
+
+		try {
+			commandBuffer.end();
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Couldn't end command buffer!" + std::string(err.what()));
+		}
+
+		vk::SubmitInfo submitInfo{};
+		submitInfo.sType = vk::StructureType::eSubmitInfo;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+
+		try {
+			graphicsQueue.submit(submitInfo, nullptr);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to submit to graphics queue!" + std::string(err.what()));
+		}
+
+		try {
+			graphicsQueue.waitIdle();
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to wait on graphics queue!" + std::string(err.what()));
+		}
+
+		try {
+			logicalDevice.freeCommandBuffers(commandPool, 1, &commandBuffer);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to free command buffer!" + std::string(err.what()));
+		}
 	}
 
 	uint32_t findMemotyType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
