@@ -1093,21 +1093,15 @@ private:
 		}
 	}
 
-	void createBuffer() {
-
-	}
-
-	// 11. Create Vertex Buffer
-	void createVertexBuffer() {
-
+	void createBuffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Buffer& buffer, vk::DeviceMemory& bufferMemory) {
 		vk::BufferCreateInfo bufferInfo{};
 		bufferInfo.sType = vk::StructureType::eBufferCreateInfo;
-		bufferInfo.size = static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
-		bufferInfo.usage = vk::BufferUsageFlagBits::eVertexBuffer;
+		bufferInfo.size = size;
+		bufferInfo.usage = usage;
 		bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 
 		try {
-			vertexBuffer = logicalDevice.createBuffer(bufferInfo, nullptr);
+			buffer = logicalDevice.createBuffer(bufferInfo, nullptr);
 		}
 		catch (vk::SystemError& err) {
 			throw std::runtime_error("Failed to create vertex buffer" + std::string(err.what()));
@@ -1115,34 +1109,41 @@ private:
 
 		// assign mem to vertex buffer
 		vk::MemoryRequirements memRequirements;
-		memRequirements = logicalDevice.getBufferMemoryRequirements(vertexBuffer);
+		memRequirements = logicalDevice.getBufferMemoryRequirements(buffer);
 
 		// mem allocation
 		vk::MemoryAllocateInfo allocInfo{};
 		allocInfo.sType = vk::StructureType::eMemoryAllocateInfo;
 		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = findMemotyType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+		allocInfo.memoryTypeIndex = findMemotyType(memRequirements.memoryTypeBits, properties);
 
 		try {
-			vertexBufferMemory = logicalDevice.allocateMemory(allocInfo);
+			bufferMemory = logicalDevice.allocateMemory(allocInfo);
 		}
 		catch (vk::SystemError& err) {
 			throw std::runtime_error("Failed to create vertex buffer memory!");
 		}
 
 		// bind mem with buffer
-		logicalDevice.bindBufferMemory(vertexBuffer, vertexBufferMemory, 0);
+		logicalDevice.bindBufferMemory(buffer, bufferMemory, 0);
+	}
+
+	// 11. Create Vertex Buffer
+	void createVertexBuffer() {
+
+		vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(sizeof(vertices[0]) * vertices.size());
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, vertexBuffer, vertexBufferMemory);
 
 		// map memory
 		void* data = nullptr;
 		try {
-			data = logicalDevice.mapMemory(vertexBufferMemory, 0, bufferInfo.size, vk::MemoryMapFlags());
+			data = logicalDevice.mapMemory(vertexBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
 
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to map memory!" + std::string(err.what()));
 		}
-		memcpy(data, vertices.data(), (size_t)bufferInfo.size);
+		memcpy(data, vertices.data(), (size_t)bufferSize);
 		logicalDevice.unmapMemory(vertexBufferMemory);
 	}
 
