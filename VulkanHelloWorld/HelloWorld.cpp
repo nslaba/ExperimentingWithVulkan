@@ -178,6 +178,11 @@ private:
 	vk::DeviceMemory indexBufferMemory;
 	vk::Buffer indexBuffer;
 
+	// UBOs
+	std::vector<vk::Buffer> uniformBuffers;
+	std::vector<vk::DeviceMemory> uniformBuffersMemory;
+	std::vector<void *> uniformBuffersMapped;
+
 	/* Member structs */
 	
 	// vulkan creation
@@ -275,6 +280,9 @@ private:
 
 		// 12. Create Index Buffer
 		createIndexBuffer();
+
+		// 13. Create Uniform Buffers
+		createUniformBuffers();
 
 		// 13. Create Command Buffer
 		createCommandBuffers();
@@ -873,7 +881,7 @@ private:
 			descriptorSetLayout = logicalDevice.createDescriptorSetLayout(layoutInfo);
 		}
 		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to create descriptor layout!" + std::string(err.what()));
+			throw std::runtime_error("Failed to create descriptor set layout!" + std::string(err.what()));
 		}
 
 	}
@@ -1008,8 +1016,8 @@ private:
 		// Pipeline Layout
 		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
 		pipelineLayoutInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
-		pipelineLayoutInfo.setLayoutCount = 0;
-		pipelineLayoutInfo.pSetLayouts = nullptr;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
 		pipelineLayoutInfo.pushConstantRangeCount = 0; // another way of passing dynamic data to shaders
 		pipelineLayoutInfo.pPushConstantRanges = nullptr;
 
@@ -1345,6 +1353,22 @@ private:
 		}
 	}
 
+	// 13. Create Uniform Buffers
+	void createUniformBuffers() {
+		vk::DeviceSize bufferSize = sizeof(UniformBufferObject);
+
+		uniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		uniformBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+		uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			//createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformBuffers[i], uniformBuffersMapped[i]);
+			//
+			//try {
+			//	uniformBuffersMapped[i] = logicalDevice.mapMemory(uniformBuffersMemory[i], 0, bufferSize);
+			//}
+		}
+	}
 	
 	// 13. Create Command Buffer
 	void createCommandBuffers() {
@@ -1576,6 +1600,7 @@ private:
 		// clean up swap chains
 		cleanupSwapChain();
 
+		logicalDevice.destroyDescriptorSetLayout(descriptorSetLayout);
 		logicalDevice.destroyBuffer(indexBuffer);
 		logicalDevice.freeMemory(indexBufferMemory);
 		logicalDevice.destroyBuffer(vertexBuffer);
