@@ -29,6 +29,12 @@
 #include <glm.hpp> // library used for lin alg related types
 #include <array>
 
+
+#define GLM_FORCE_RADIANS // forces using radians
+#include <gtc/matrix_transform.hpp>
+
+#include <chrono> // timekeeping
+
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
@@ -1362,11 +1368,14 @@ private:
 		uniformBuffersMapped.resize(MAX_FRAMES_IN_FLIGHT);
 
 		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-			//createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformBuffers[i], uniformBuffersMapped[i]);
-			//
-			//try {
-			//	uniformBuffersMapped[i] = logicalDevice.mapMemory(uniformBuffersMemory[i], 0, bufferSize);
-			//}
+			createBuffer(bufferSize, vk::BufferUsageFlagBits::eUniformBuffer, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, uniformBuffers[i], uniformBuffersMemory[i]);
+			
+			try {
+				uniformBuffersMapped[i] = logicalDevice.mapMemory(uniformBuffersMemory[i], 0, bufferSize, vk::MemoryMapFlags());
+			}
+			catch (vk::SystemError& err) {
+				throw std::runtime_error("Failed to map memory to a uniform buffer!" + std::string(err.what()));
+			}
 		}
 	}
 	
@@ -1525,6 +1534,9 @@ private:
 
 		recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 		
+		// UOB
+		updateUniformBuffer(currentFrame);
+
 		// Queue submission and synchronization
 		vk::SubmitInfo submitInfo{};
 		submitInfo.sType = vk::StructureType::eSubmitInfo;
@@ -1588,6 +1600,25 @@ private:
 		currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 	}
 
+	// Will generate a new transformation every frame to make the geometry spin around
+	void updateUniformBuffer(uint32_t currentImage) {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+		// UBO nescesities for rotation
+		UniformBufferObject ubo{};
+		ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // eye, center, up axis
+		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f); // 45 deg vert FOV, aspect ratio, near, far planes
+		ubo.proj[1][1] *= -1; //if I don't do this image rendered upside down since GLM originally designed for openGL where Y coordinate in clip coord is inverted
+
+		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
+
+
+	}
+
 	void mainLoop() {
 		while (!glfwWindowShouldClose(window)) {
 			glfwPollEvents();
@@ -1599,6 +1630,12 @@ private:
 	void cleanup() {
 		// clean up swap chains
 		cleanupSwapChain();
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			logicalDevice.destroyBuffer(uniformBuffers[i]);
+			logicalDevice.freeMemory(uniformBuffersMemory[i]);
+		}
+
 
 		logicalDevice.destroyDescriptorSetLayout(descriptorSetLayout);
 		logicalDevice.destroyBuffer(indexBuffer);
