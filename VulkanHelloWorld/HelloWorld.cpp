@@ -191,6 +191,7 @@ private:
 
 	// descriptors
 	vk::DescriptorPool descriptorPool;
+	std::vector<vk::DescriptorSet> descriptorSets;
 
 	/* Member structs */
 	
@@ -211,8 +212,7 @@ private:
 	
 	vk::PhysicalDeviceFeatures deviceFeatures{};
 
-	// logical device
-	vk::DeviceCreateInfo deviceCreateInfo{};
+	
 
 	// swap chains
 	const std::vector<const char*> deviceExtension = {
@@ -295,6 +295,9 @@ private:
 
 		// 14. Create Descriptor pools
 		createDescriptorPools();
+
+		// 15. Create descriptor sets
+		createDescriptorSets();
 
 		// 13. Create Command Buffer
 		createCommandBuffers();
@@ -577,6 +580,7 @@ private:
 		vk::PhysicalDeviceFeatures deviceFeatures = physicalDevice.getFeatures();
 
 		// device create info
+		vk::DeviceCreateInfo deviceCreateInfo{};
 		deviceCreateInfo.sType = vk::StructureType::eDeviceCreateInfo;
 		deviceCreateInfo.pQueueCreateInfos = queueCreateInfos.data();
 		deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
@@ -598,7 +602,11 @@ private:
 		if (enableValidationLayers)
 		{
 			//ignore for now
-			//deviceCreateInfo.enabledLayerCount = static_cast<uint_32_t>(validationLayers.size());
+			deviceCreateInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+			deviceCreateInfo.ppEnabledLayerNames = validationLayers.data();
+		}
+		else {
+			deviceCreateInfo.enabledLayerCount = 0;
 		}
 
 
@@ -1405,6 +1413,51 @@ private:
 		}
 	}
 	
+	// 15. Create descriptor sets
+	void createDescriptorSets() {
+		std::vector<vk::DescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, descriptorSetLayout);
+		vk::DescriptorSetAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eDescriptorSetAllocateInfo;
+		allocInfo.descriptorPool = descriptorPool;
+		allocInfo.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT); // one descriptor set for each frame in flight
+		allocInfo.pSetLayouts = layouts.data();
+
+		descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+
+		try {
+			descriptorSets = logicalDevice.allocateDescriptorSets(allocInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to allocate descriptor sets!" + std::string(err.what()));
+		}
+
+		// configure descriptors
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			vk::DescriptorBufferInfo bufferInfo{};
+			bufferInfo.buffer = uniformBuffers[i];
+			bufferInfo.offset = 0;
+			bufferInfo.range = sizeof(UniformBufferObject);
+
+			vk::WriteDescriptorSet descriptorWrite{};
+			descriptorWrite.sType = vk::StructureType::eWriteDescriptorSet;
+			descriptorWrite.dstSet = descriptorSets[i];
+			descriptorWrite.dstBinding = 0;
+			descriptorWrite.dstArrayElement = 0;
+			descriptorWrite.descriptorType = vk::DescriptorType::eUniformBuffer;
+			descriptorWrite.descriptorCount = 1;
+			descriptorWrite.pBufferInfo = &bufferInfo;
+			descriptorWrite.pImageInfo = nullptr;
+			descriptorWrite.pTexelBufferView = nullptr;
+
+			try {
+				logicalDevice.updateDescriptorSets(descriptorWrite, nullptr);
+			}
+			catch (vk::SystemError& err) {
+				throw std::runtime_error("Failed to update descriptor set!" + std::string(err.what()));
+			}
+		}
+	}
+
 	// 13. Create Command Buffer
 	void createCommandBuffers() {
 		commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
@@ -1487,7 +1540,13 @@ private:
 		scissor.extent = swapChainExtent;
 		commandBuffer.setScissor(0, 1, &scissor);
 
-		//commandBuffer.draw(3, 1, 0, 0); // vertex count (3 vertices to draw), instance count, first vertex (offset into the vertex buffer), first instance (offset for instanced rendering)
+		try {
+			commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, pipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to bind descriptor sets!" + std::string(err.what()));
+		}
+		
 		try {
 			commandBuffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 			//commandBuffer.draw(static_cast<uint32_t>(vertices.size()), 1, 0, 0);
@@ -1662,7 +1721,7 @@ private:
 			logicalDevice.freeMemory(uniformBuffersMemory[i]);
 		}
 
-
+		logicalDevice.destroyDescriptorPool(descriptorPool);
 		logicalDevice.destroyDescriptorSetLayout(descriptorSetLayout);
 		logicalDevice.destroyBuffer(indexBuffer);
 		logicalDevice.freeMemory(indexBufferMemory);
