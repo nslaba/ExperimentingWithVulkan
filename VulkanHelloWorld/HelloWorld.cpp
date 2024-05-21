@@ -189,6 +189,9 @@ private:
 	std::vector<vk::DeviceMemory> uniformBuffersMemory;
 	std::vector<void *> uniformBuffersMapped;
 
+	// descriptors
+	vk::DescriptorPool descriptorPool;
+
 	/* Member structs */
 	
 	// vulkan creation
@@ -289,6 +292,9 @@ private:
 
 		// 13. Create Uniform Buffers
 		createUniformBuffers();
+
+		// 14. Create Descriptor pools
+		createDescriptorPools();
 
 		// 13. Create Command Buffer
 		createCommandBuffers();
@@ -1376,6 +1382,26 @@ private:
 			catch (vk::SystemError& err) {
 				throw std::runtime_error("Failed to map memory to a uniform buffer!" + std::string(err.what()));
 			}
+		}
+	}
+
+	// 14. Create descriptor pools
+	void createDescriptorPools() {
+		vk::DescriptorPoolSize poolSize{};
+		poolSize.type = vk::DescriptorType::eUniformBuffer;
+		poolSize.descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+		vk::DescriptorPoolCreateInfo poolInfo{};
+		poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;
+		poolInfo.poolSizeCount = 1;
+		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.maxSets = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+
+		try {
+			descriptorPool = logicalDevice.createDescriptorPool(poolInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create a descriptor pool!" + std::string(err.what()));
 		}
 	}
 	
