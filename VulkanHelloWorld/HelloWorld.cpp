@@ -195,8 +195,7 @@ private:
 
 	/* Member structs */
 	
-	// vulkan creation
-	vk::InstanceCreateInfo createInfo{};
+	
 
 	// physical dvice
 	struct QueueFamilyIndeces {
@@ -210,7 +209,7 @@ private:
 	
 
 	
-	vk::PhysicalDeviceFeatures deviceFeatures{};
+	
 
 	
 
@@ -309,30 +308,26 @@ private:
 	// validation layers
 	// checks if all the requested layers are available
 	bool checkValidationLayerSupport() {
-		uint32_t layerCount;
-		assert(vk::enumerateInstanceLayerProperties(&layerCount, nullptr) == vk::Result::eSuccess); // lists all available layers
-
-		std::vector<vk::LayerProperties> availableLayers(layerCount);
-		assert(vk::enumerateInstanceLayerProperties(&layerCount, availableLayers.data()) == vk::Result::eSuccess);
-
+		std::vector<vk::LayerProperties> availableLayers = vk::enumerateInstanceLayerProperties();
+		
 
 		// check if all the layers exist
 		for (const char* layerName : validationLayers) {
 			bool layerFound = false;
-
+		
 			for (const auto& layerProperties : availableLayers) {
 				if (strcmp(layerName, layerProperties.layerName) == 0) {
 					layerFound = true;
 					break;
 				}
 			}
-
+		
 			if (!layerFound) {
 				return false;
 			}
 		}
 
-		
+		return true;
 	}
 
 	// validation layer callback
@@ -378,16 +373,25 @@ private:
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.apiVersion = VK_API_VERSION_1_0;
 
+		// vulkan creation
+		vk::InstanceCreateInfo createInfo{};
 		createInfo.sType = vk::StructureType::eInstanceCreateInfo;
 		createInfo.pApplicationInfo = &appInfo;
+
+		vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
 		// validation layers
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
 			createInfo.ppEnabledLayerNames = validationLayers.data();
+
+			populateDebugMessengerCreateInfo(debugCreateInfo);
+			createInfo.pNext = (vk::DebugUtilsMessengerCreateInfoEXT*)&debugCreateInfo;
 		}
 		else {
 			createInfo.enabledLayerCount = 0;
+
+			createInfo.pNext = nullptr;
 		}
 
 		uint32_t glfwExtensionCount = 0;
@@ -399,29 +403,42 @@ private:
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
 		createInfo.ppEnabledExtensionNames = extensions.data();
 		
-		//vk::Result result = vk::createInstance(&createInfo, nullptr, &instance);
 
 		// create instance && throw run time error if unsuccessful
-		if (vk::createInstance(&createInfo, nullptr, &instance) != vk::Result::eSuccess) {
-			throw std::runtime_error("failed to create instance!");
+		try {
+			instance = vk::createInstance(createInfo);
 		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create a vulkan instance!" + std::string(err.what()));
+		}
+
+		// checking extensions
+		
+		std::vector<vk::ExtensionProperties> generalExtensions = vk::enumerateInstanceExtensionProperties();
+		for (vk::ExtensionProperties& ext : generalExtensions) {
+			std::cout << "Extension Name: " << ext.extensionName << "\n";
+			std::cout << "Extension Version: " << ext.specVersion << "\n";
+		}
+
 	}
 
-	// DEBUGGING -- debug messenger setup
-	void setupDebugMessenger() {
-		if (!enableValidationLayers) return;
-
-		
-		//dldi.init(instance);
-		//auto createDebugUtilsMessengerEXT = dldi.get(vk::Instance::createDebugUtilsMessengerEXT);
-		
-		
-		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+	void populateDebugMessengerCreateInfo(vk::DebugUtilsMessengerCreateInfoEXT& createInfo) {
+		//createInfo = {};
 		createInfo.sType = vk::StructureType::eDebugUtilsMessengerCreateInfoEXT;
 		createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError; // what you'd like the call back to be called for
 		createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
 		createInfo.pfnUserCallback = reinterpret_cast<PFN_vkDebugUtilsMessengerCallbackEXT>(debugCallback);
 		createInfo.pUserData = nullptr;
+
+	}
+
+
+	// DEBUGGING -- debug messenger setup
+	void setupDebugMessenger() {
+		if (!enableValidationLayers) return;
+		
+		vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
+		populateDebugMessengerCreateInfo(createInfo);
 		
 		if (CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger) != vk::Result::eSuccess) {
 			throw std::runtime_error("Failed to set up debug messenger");
@@ -454,10 +471,7 @@ private:
 	void pickPhysicalDevice() {
 		uint32_t deviceCount = 0;
 		auto devices = instance.enumeratePhysicalDevices();
-		if (!devices.empty()) {
-			physicalDevice = devices[0];
-		}
-		else {
+		if (devices.empty()) {
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
 		}
 
@@ -483,6 +497,7 @@ private:
 		deviceProperties = device.getProperties();
 
 		//vk::PhysicalDeviceFeatures deviceFeatures;
+		vk::PhysicalDeviceFeatures deviceFeatures{};
 		deviceFeatures = device.getFeatures();
 
 		// deal with queues
@@ -598,6 +613,7 @@ private:
 			extensionNames.push_back(extension.extensionName);
 		}
 		deviceCreateInfo.ppEnabledExtensionNames = extensionNames.data();
+		
 
 		if (enableValidationLayers)
 		{
@@ -993,7 +1009,7 @@ private:
 		rasterizer.polygonMode = vk::PolygonMode::eFill; // how fragments are generated for geom
 		rasterizer.lineWidth = 1.0f;
 		rasterizer.cullMode = vk::CullModeFlagBits::eBack;
-		rasterizer.frontFace = vk::FrontFace::eClockwise;
+		rasterizer.frontFace = vk::FrontFace::eCounterClockwise;
 		rasterizer.depthBiasEnable = vk::False;
 		rasterizer.depthBiasConstantFactor = 0.0f;
 		rasterizer.depthBiasClamp = 0.0f;
