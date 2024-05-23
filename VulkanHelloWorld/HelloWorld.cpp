@@ -1312,6 +1312,71 @@ private:
 	}
 
 
+	// Helper func for recording and executing a command buffer
+	vk::CommandBuffer beginSingleTimeCommands() {
+		vk::CommandBufferAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+		allocInfo.level = vk::CommandBufferLevel::ePrimary;
+		allocInfo.commandPool = commandPool;
+		allocInfo.commandBufferCount = 1;
+
+		vk::CommandBuffer commandBuffer;
+		try {
+			commandBuffer = logicalDevice.allocateCommandBuffers(allocInfo)[0];
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to allocate command buffer: " + std::string(err.what()));
+		}
+
+		vk::CommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+		try {
+			commandBuffer.begin(beginInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to execuete command buffer: " + std::string(err.what()));
+		}
+
+		return commandBuffer;
+	}
+
+	void endSingleTimeCommands(vk::CommandBuffer commandBuffer) {
+		try {
+			commandBuffer.end();
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to end command buffer! " + std::string(err.what()));
+		}
+
+		vk::SubmitInfo submitInfo{};
+		submitInfo.sType = vk::StructureType::eSubmitInfo;
+		submitInfo.commandBufferCount = 1;
+		submitInfo.pCommandBuffers = &commandBuffer;
+
+		try {
+			graphicsQueue.submit(submitInfo, nullptr);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to submit to graphics queue!" + std::string(err.what()));
+		}
+
+		try {
+			graphicsQueue.waitIdle();
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to wait on graphics queue!" + std::string(err.what()));
+		}
+
+		try {
+			logicalDevice.freeCommandBuffers(commandPool, 1, &commandBuffer);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to free command buffer!" + std::string(err.what()));
+		}
+	}
+
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
 		// use staging buffer as an 'intermediate' between cpu and gpu.
@@ -1358,35 +1423,11 @@ private:
 
 	void copyBuffer(vk::Buffer srcBuffer, vk::Buffer dstBuffer, vk::DeviceSize size)
 	{
-		vk::CommandBufferAllocateInfo allocInfo{};
-		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
-		allocInfo.level = vk::CommandBufferLevel::ePrimary;
-		allocInfo.commandPool = commandPool;
-		allocInfo.commandBufferCount = 1;
-
-		vk::CommandBuffer commandBuffer;
-		try {
-			commandBuffer = logicalDevice.allocateCommandBuffers(allocInfo)[0];
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Couldn't allocate command buffer!" + std::string(err.what()));
-		}
-
-		vk::CommandBufferBeginInfo beginInfo{};
-		beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
-		beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-
-		try {
-			commandBuffer.begin(beginInfo);
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to begin command buffer!" + std::string(err.what()));
-		}
+		vk::CommandBuffer commandBuffer = beginSingleTimeCommands();
 
 		vk::BufferCopy copyRegion{};
-		copyRegion.srcOffset = 0;
-		copyRegion.dstOffset = 0;
 		copyRegion.size = size;
+
 		try {
 			commandBuffer.copyBuffer(srcBuffer, dstBuffer, 1, &copyRegion);
 		}
@@ -1394,38 +1435,7 @@ private:
 			throw std::runtime_error("Failed to transfer data between buffers!" + std::string(err.what()));
 		}
 
-		try {
-			commandBuffer.end();
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Couldn't end command buffer!" + std::string(err.what()));
-		}
-
-		vk::SubmitInfo submitInfo{};
-		submitInfo.sType = vk::StructureType::eSubmitInfo;
-		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffer;
-
-		try {
-			graphicsQueue.submit(submitInfo, nullptr);
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to submit to graphics queue!" + std::string(err.what()));
-		}
-
-		try {
-			graphicsQueue.waitIdle();
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to wait on graphics queue!" + std::string(err.what()));
-		}
-
-		try {
-			logicalDevice.freeCommandBuffers(commandPool, 1, &commandBuffer);
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to free command buffer!" + std::string(err.what()));
-		}
+		endSingleTimeCommands(commandBuffer);
 	}
 
 	uint32_t findMemotyType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
