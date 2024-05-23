@@ -196,6 +196,10 @@ private:
 	vk::DescriptorPool descriptorPool;
 	std::vector<vk::DescriptorSet> descriptorSets;
 
+	// Textures
+	vk::Image textureImage;
+	vk::DeviceMemory textureImageMemory;
+
 	/* Member structs */
 	
 	
@@ -1250,6 +1254,61 @@ private:
 		}
 		memcpy(data, pixels, static_cast<size_t>(imageSize));
 		logicalDevice.unmapMemory(stagingBufferMemory);
+
+		stbi_image_free(pixels);
+
+		
+		createImage(texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal, textureImage, textureImageMemory);
+		
+	}
+
+	void createImage(uint32_t width, uint32_t height, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::Image& image, vk::DeviceMemory& imageMemory) {
+		vk::ImageCreateInfo imageInfo{};
+		imageInfo.sType = vk::StructureType::eImageCreateInfo;
+		imageInfo.imageType = vk::ImageType::e2D;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.format = format;
+		imageInfo.tiling = tiling;
+		imageInfo.initialLayout = vk::ImageLayout::eUndefined;
+		imageInfo.usage = usage;
+		imageInfo.sharingMode = vk::SharingMode::eExclusive;
+		imageInfo.samples = vk::SampleCountFlagBits::e1;
+		imageInfo.flags = vk::ImageCreateFlags();
+
+		try {
+			textureImage = logicalDevice.createImage(imageInfo, nullptr);
+
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create an image!" + std::string(err.what()));
+		}
+
+		vk::MemoryRequirements memRequirements;
+		try {
+			memRequirements = logicalDevice.getImageMemoryRequirements(textureImage);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create memory requirements for image!" + std::string(err.what()));
+		}
+
+		vk::MemoryAllocateInfo allocInfo{};
+		allocInfo.sType = vk::StructureType::eMemoryAllocateInfo;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = findMemotyType(memRequirements.memoryTypeBits, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+		try {
+			textureImageMemory = logicalDevice.allocateMemory(allocInfo, nullptr);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to allocate memory for texture image!");
+
+		}
+
+		logicalDevice.bindImageMemory(textureImage, textureImageMemory, 0);
 	}
 
 
