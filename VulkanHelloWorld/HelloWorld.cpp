@@ -35,6 +35,9 @@
 
 #include <chrono> // timekeeping
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
@@ -282,6 +285,9 @@ private:
 
 		// 10. Create Command pool
 		createCommandPool();
+
+		// 11. create Texture image
+		createTextureImage();
 
 		// 11. Create Vertex Buffer
 		createVertexBuffer();
@@ -1217,6 +1223,35 @@ private:
 		// bind mem with buffer
 		logicalDevice.bindBufferMemory(buffer, bufferMemory, 0);
 	}
+
+	// 11. Create texture image
+	void createTextureImage() {
+		int texWidth, texHeight, texChannels;
+		stbi_uc* pixels = stbi_load("Textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		vk::DeviceSize imageSize = texWidth * texHeight * 4; // pixels are laid out row by row with 4 bytes per pixel in the case of STBI_rgb_alpha
+
+		if (!pixels) {
+			throw std::runtime_error("Failed to load texture image!");
+		}
+
+		vk::Buffer stagingBuffer;
+		vk::DeviceMemory stagingBufferMemory;
+
+		createBuffer(imageSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+
+		void* data;
+		try {
+			data = logicalDevice.mapMemory(stagingBufferMemory, 0, imageSize, vk::MemoryMapFlags()); // mapping creates a link between cpu and gpu memory, but keeping it mapped forever can create contention
+
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to map memory!" + std::string(err.what()));
+		}
+		memcpy(data, pixels, static_cast<size_t>(imageSize));
+		logicalDevice.unmapMemory(stagingBufferMemory);
+	}
+
 
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
