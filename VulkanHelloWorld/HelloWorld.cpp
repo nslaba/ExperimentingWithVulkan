@@ -1402,6 +1402,14 @@ private:
 		endSingleTimeCommands(commandBuffer);
 	}
 
+	// Helper func for coping buffer to image
+	void copyBufferToImage(vk::Buffer buffer, vk::Image image, uint32_t width, uint32_t height) {
+		vk::CommandBuffer commandBuffer = beginSingleTimeCommands();
+
+
+		endSingleTimeCommands(commandBuffer);
+	}
+
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
 		// use staging buffer as an 'intermediate' between cpu and gpu.
