@@ -1377,6 +1377,31 @@ private:
 		}
 	}
 
+	// helper func for layout
+	void transitionImageLayout(vk::Image image, vk::Format format, vk::ImageLayout oldLayout, vk::ImageLayout newLayout) {
+		vk::CommandBuffer commandBuffer = beginSingleTimeCommands();
+
+		// Layout transition use image memory barrier
+		vk::ImageMemoryBarrier barrier{};
+		barrier.sType = vk::StructureType::eImageMemoryBarrier;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+		barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+		barrier.image = image;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1; // since not mip mapped
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		/*barrier.srcAccessMask = vk::AccessFlagBits::z;*/
+		/*barrier.dstAccessMask = 0;*/ // Will get back to once transitions are figured out
+
+		// submit barrier 
+		commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, vk::DependencyFlags(), nullptr, nullptr, barrier);
+
+		endSingleTimeCommands(commandBuffer);
+	}
+
 	// 11. Create Vertex Buffer
 	void createVertexBuffer() {
 		// use staging buffer as an 'intermediate' between cpu and gpu.
