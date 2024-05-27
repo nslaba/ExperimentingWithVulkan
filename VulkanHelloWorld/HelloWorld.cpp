@@ -56,23 +56,23 @@ struct Vertex {
 
 
 	static std::array<vk::VertexInputAttributeDescription, 3> getAttributeDescriptions() {
-		std::array<vk::VertexInputAttributeDescription, 3> attributeDescription;
-		attributeDescription[0].binding = 0;
-		attributeDescription[0].location = 0;
-		attributeDescription[0].format = vk::Format::eR32G32Sfloat;
-		attributeDescription[0].offset = offsetof(Vertex, pos);
+		std::array<vk::VertexInputAttributeDescription, 3> attributeDescriptions{};
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = vk::Format::eR32G32Sfloat;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+							
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = vk::Format::eR32G32B32Sfloat;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+							
+		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].location = 2;
+		attributeDescriptions[2].format = vk::Format::eR32G32Sfloat;
+		attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
 
-		attributeDescription[1].binding = 0;
-		attributeDescription[1].location = 1;
-		attributeDescription[1].format = vk::Format::eR32G32B32Sfloat;
-		attributeDescription[1].offset = offsetof(Vertex, color);
-
-		attributeDescription[2].binding = 0;
-		attributeDescription[2].location = 2;
-		attributeDescription[2].format = vk::Format::eR32G32Sfloat;
-		attributeDescription[2].offset = offsetof(Vertex, texCoord);
-
-		return attributeDescription;
+		return attributeDescriptions;
 	}
 
 };
@@ -82,7 +82,7 @@ const std::vector<uint16_t> indices = {
 	0, 1, 2, 2, 3, 0 // order of rectangle vertices
 };
 
-std::vector<Vertex> vertices = {
+const std::vector<Vertex> vertices = {
 	{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
 	{{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
 	{{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
@@ -320,7 +320,7 @@ private:
 		createUniformBuffers();
 
 		// 14. Create Descriptor pools
-		createDescriptorPools();
+		createDescriptorPool();
 
 		// 15. Create descriptor sets
 		createDescriptorSets();
@@ -1400,6 +1400,7 @@ private:
 		barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
 		barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
 		barrier.image = image;
+		barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
 		barrier.subresourceRange.baseMipLevel = 0;
 		barrier.subresourceRange.levelCount = 1; // since not mip mapped
 		barrier.subresourceRange.baseArrayLayer = 0;
@@ -1411,14 +1412,14 @@ private:
 		vk::PipelineStageFlags destinationStage;
 
 		if (oldLayout == vk::ImageLayout::eUndefined && newLayout == vk::ImageLayout::eTransferDstOptimal) {
-			barrier.srcAccessMask = vk::AccessFlags();
-			barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+			barrier.srcAccessMask = vk::AccessFlags(); // no need to wait on anything since image is undefined
+			barrier.dstAccessMask = vk::AccessFlagBits::eTransferWrite; // destination written by a transfer operation
 
 			sourceStage = vk::PipelineStageFlagBits::eTopOfPipe;
 			destinationStage = vk::PipelineStageFlagBits::eTransfer;
 
 		}
-		else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) {
+		else if (oldLayout == vk::ImageLayout::eTransferDstOptimal && newLayout == vk::ImageLayout::eShaderReadOnlyOptimal) { // image was used for a transfer op and is now being used to read by a shader
 			barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
 			barrier.dstAccessMask = vk::AccessFlagBits::eShaderRead;
 			sourceStage = vk::PipelineStageFlagBits::eTransfer;
@@ -1498,20 +1499,21 @@ private:
 	void createTextureSampler() {
 		vk::SamplerCreateInfo samplerInfo{};
 		samplerInfo.sType = vk::StructureType::eSamplerCreateInfo;
-		samplerInfo.magFilter = vk::Filter::eLinear;
-		samplerInfo.minFilter = vk::Filter::eLinear;
+		samplerInfo.magFilter = vk::Filter::eLinear; // oversampling: more fragments than texels
+		samplerInfo.minFilter = vk::Filter::eLinear; // undersampling: more texels than fragments
 
+		// For texture space coordinates
 		samplerInfo.addressModeU = vk::SamplerAddressMode::eRepeat;
 		samplerInfo.addressModeV = vk::SamplerAddressMode::eRepeat;
 		samplerInfo.addressModeW = vk::SamplerAddressMode::eRepeat;
 
 		samplerInfo.anisotropyEnable = vk::True;
-		//samplerInfo.maxAnisotropy = ? ? ? ;
+	
 
 		vk::PhysicalDeviceProperties properties{};
 		properties = physicalDevice.getProperties();
 
-		samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+		samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy; // limits that max number of texel samples that can be used to calculate the final color
 		samplerInfo.borderColor = vk::BorderColor::eIntOpaqueBlack;
 		samplerInfo.unnormalizedCoordinates = vk::False;
 		samplerInfo.compareEnable=vk::False;
@@ -1666,7 +1668,7 @@ private:
 	}
 
 	// 14. Create descriptor pools
-	void createDescriptorPools() {
+	void createDescriptorPool() {
 		std::array<vk::DescriptorPoolSize, 2> poolSizes{};
 		poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
 		poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
@@ -1730,16 +1732,17 @@ private:
 			
 			descriptorWrites[1].sType = vk::StructureType::eWriteDescriptorSet;
 			descriptorWrites[1].dstSet = descriptorSets[i];
-			descriptorWrites[1].dstBinding = 0;
+			descriptorWrites[1].dstBinding = 1;
 			descriptorWrites[1].dstArrayElement = 0;
 			descriptorWrites[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+			descriptorWrites[1].descriptorCount = 1;
+			descriptorWrites[1].pImageInfo = &imageInfo;
 			
-			
-			descriptorWrites[1].pImageInfo = nullptr;
-			descriptorWrites[1].pTexelBufferView = nullptr;
+			//descriptorWrites[1].pImageInfo = nullptr;
+			//descriptorWrites[1].pTexelBufferView = nullptr;
 
 			try {
-				logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
+				logicalDevice.updateDescriptorSets(descriptorWrites, {});
 			} // MIGHT HAVE TO CHANGE
 			catch (vk::SystemError& err) {
 				throw std::runtime_error("Failed to update descriptor set!" + std::string(err.what()));
