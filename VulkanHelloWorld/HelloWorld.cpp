@@ -94,6 +94,8 @@ struct UniformBufferObject {
 	glm::mat4 model;
 	glm::mat4 view;
 	glm::mat4 proj;
+	float time;
+	float aspectRatio;
 };
 
 const uint32_t WIDTH = 800;
@@ -909,7 +911,7 @@ private:
 		uboLayoutBinding.binding = 0;
 		uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
 		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex;
+		uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
 		uboLayoutBinding.pImmutableSamplers = nullptr;
 
 		vk::DescriptorSetLayoutBinding samplerLayoutBinding{};
@@ -1911,7 +1913,7 @@ private:
 
 		recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
 		
-		// UOB
+		// UBO
 		updateUniformBuffer(currentFrame);
 
 		// Queue submission and synchronization
@@ -1983,13 +1985,16 @@ private:
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+		float aspectRatio = swapChainExtent.width / (float)swapChainExtent.height;
 
 		// UBO nescesities for rotation
 		UniformBufferObject ubo{};
-		ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)); // eye, center, up axis
-		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f); // 45 deg vert FOV, aspect ratio, near, far planes
+		ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.view = glm::lookAt(glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)); // eye, center, up axis
+		ubo.proj = glm::perspective(glm::radians(45.0f), aspectRatio, 0.1f, 10.0f); // 45 deg vert FOV, aspect ratio, near, far planes
 		ubo.proj[1][1] *= -1; //if I don't do this image rendered upside down since GLM originally designed for openGL where Y coordinate in clip coord is inverted
+		ubo.time = time;
+		ubo.aspectRatio = aspectRatio;
 
 		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 
