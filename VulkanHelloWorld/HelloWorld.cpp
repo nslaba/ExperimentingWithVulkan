@@ -1558,7 +1558,7 @@ private:
 		memcpy(data, vertices.data(), (size_t)bufferSize);
 		logicalDevice.unmapMemory(stagingBufferMemory);
 
-		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer, vk::MemoryPropertyFlagBits::eDeviceLocal, vertexBuffer, vertexBufferMemory);
 		
 		copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 

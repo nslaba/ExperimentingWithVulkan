@@ -8,18 +8,16 @@ layout(binding = 0) uniform UniformBufferObject {
 	float aspectRatio;
 } ubo;
 layout(binding = 1) uniform sampler2D texSampler;
-
 layout(location = 0) in vec3 fragColor;
 layout(location = 1) in vec2 fragTexCoord;
 
-layout(location = 0) out vec4 outColor;
 
-const int MAX_PARTICLES = 1000;
+layout(location = 0) out vec4 outColor;
 
 
 struct Particle {
 	vec2 position;
-	vec3 color;
+	vec2 direction;
 	float size;
 	float speed;
 };
@@ -45,20 +43,14 @@ vec3 hsv2rgb(vec3 c)
 	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-void initParticles() {
-	for (int i = 0; i < MAX_PARTICLES; i ++){
-		
-		
-	}
+void createParticle() {
+
 
 }
 
-void main() {
+vec4 createFractle(){
+
 	vec3 texColor = texture(texSampler, fragTexCoord).rgb;
-	//if (texColor.z > 0.1) {
-	//	texColor = mix(texColor, texColor.zxy, ubo.time*0.1);
-	//}
-	// Trying
 	float angle = ubo.time * 0.03;
 	vec2 normalizedCoord = texColor.xy / ubo.aspectRatio * 2.0 - 1.0;
 	for (float i = 0.0; i < 128; i++){
@@ -73,8 +65,17 @@ void main() {
 	}
 	float len = length(normalizedCoord);
 
-	outColor = vec4((len), ((length(normalizedCoord + vec2(0.2, -0.3)))), ((length(normalizedCoord + vec2(-0.4, -0.1)))), 1.0);
+	return vec4((len), ((length(normalizedCoord + vec2(0.2, -0.3)))), ((length(normalizedCoord + vec2(-0.4, -0.1)))), 1.0);
+
+}
+
+void main() {
 	
+	
+	// PARTICLE
+
+	// FRACTLE
+	outColor = createFractle();
 	//outColor = min(mix(vec4(texColor, 1.0), color, ubo.time), vec4(0.8, 0.8, 0.8, 1.0));
 	
 	
