@@ -938,14 +938,33 @@ private:
 
 	}
 
+	void createComputePipeline() {
+		auto computeShaderCode = readFile("Shaders/compute.spv");
+
+		vk::ShaderModule computeShaderModule = createShaderModule(computeShaderCode);
+
+		vk::PipelineShaderStageCreateInfo computeShaderStageInfo{};
+		computeShaderStageInfo.sType = vk::StructureType::ePipelineShaderStageCreateInfo;
+		computeShaderStageInfo.stage = vk::ShaderStageFlagBits::eCompute;
+		computeShaderStageInfo.module = computeShaderModule;
+		computeShaderStageInfo.pName = "main";
+
+
+
+
+		logicalDevice.destroyShaderModule(computeShaderModule);
+	}
+
 	// 8. create graphics pipeline
 	void createGraphicsPipeline()
 	{
 		auto vertShaderCode = readFile("Shaders/vert.spv");
 		auto fragShaderCode = readFile("Shaders/frag.spv");
+		
 
 		vk::ShaderModule vertShaderModule = createShaderModule(vertShaderCode);
 		vk::ShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+		
 
 		// Need to assign shaders to pipeline stages
 		vk::PipelineShaderStageCreateInfo vertShaderStageInfo{};
@@ -960,6 +979,8 @@ private:
 		fragShaderStageInfo.stage = vk::ShaderStageFlagBits::eFragment;
 		fragShaderStageInfo.module = fragShaderModule;
 		fragShaderStageInfo.pName = "main";
+
+		
 
 		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
 
@@ -1263,8 +1284,8 @@ private:
 
 		stbi_image_free(pixels);
 
-		
-		createImage(texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled, vk::MemoryPropertyFlagBits::eDeviceLocal, textureImage, textureImageMemory);
+		// eSampled: sampled image in fragment shader and eStorage: storage image in compute shader
+		createImage(texWidth, texHeight, vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eTransferDst | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage, vk::MemoryPropertyFlagBits::eDeviceLocal, textureImage, textureImageMemory);
 		
 		transitionImageLayout(textureImage, vk::Format::eR8G8B8A8Srgb, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal);
 		copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth), static_cast<uint32_t>(texHeight));
