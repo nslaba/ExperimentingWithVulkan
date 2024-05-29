@@ -15,14 +15,6 @@ layout(location = 1) in vec2 fragTexCoord;
 layout(location = 0) out vec4 outColor;
 
 
-struct Particle {
-	vec2 position;
-	vec2 direction;
-	float size;
-	float speed;
-};
-
-Particle particles[MAX_PARTICLES];
 
 // rgb2hsv & hsv2rgb are taken from: https://www.shadertoy.com/view/lt3GWj
 vec3 rgb2hsv(vec3 c)
@@ -43,10 +35,7 @@ vec3 hsv2rgb(vec3 c)
 	return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
 }
 
-void createParticle() {
 
-
-}
 
 vec4 createFractle(){
 
@@ -72,7 +61,7 @@ vec4 createFractle(){
 void main() {
 	
 	
-	// PARTICLE
+
 
 	// FRACTLE
 	outColor = createFractle();
