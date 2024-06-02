@@ -38,6 +38,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#include <random>
+
+const int PARTICLE_COUNT = 1000;
+struct Particle {
+	glm::vec2 position;
+	glm::vec2 velocity;
+	glm::vec4 color;
+};
 struct Vertex {
 	glm::vec2 pos;
 	glm::vec3 color;
@@ -209,6 +217,11 @@ private:
 	std::vector<vk::DeviceMemory> uniformBuffersMemory;
 	std::vector<void *> uniformBuffersMapped;
 
+	// SSBOs
+	std::vector<vk::Buffer> shaderStorageBuffers;
+	std::vector<vk::DeviceMemory> shaderStorageBuffersMemory;
+	std::vector<void*> shaderStorageBuffersMapped;
+
 	// descriptors
 	vk::DescriptorPool descriptorPool;
 	std::vector<vk::DescriptorSet> descriptorSets;
@@ -331,6 +344,9 @@ private:
 
 		// 13. Create Uniform Buffers
 		createUniformBuffers();
+
+		// 14 ssbo's
+		createShaderStorageBuffers();
 
 		// 14. Create Descriptor pools
 		createDescriptorPool();
@@ -1754,6 +1770,43 @@ private:
 			catch (vk::SystemError& err) {
 				throw std::runtime_error("Failed to map memory to a uniform buffer!" + std::string(err.what()));
 			}
+		}
+	}
+
+	// 14. SSBO's
+	void createShaderStorageBuffers() {
+		shaderStorageBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		shaderStorageBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
+
+		// create particles
+		std::default_random_engine rndEngine((unsigned)time(nullptr));
+		std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
+
+		std::vector<Particle> particles(PARTICLE_COUNT);
+		for (auto& particle : particles) {
+			float r = 0.25f * sqrt(rndDist(rndEngine));
+			float theta = rndDist(rndEngine) * 2 * 3.14159265358979323846;
+			float x = r * cos(theta) * HEIGHT / WIDTH;
+			float y = r * sin(theta);
+			particle.position = glm::vec2(x, y);
+			particle.velocity = glm::normalize(glm::vec2(x, y)) * 0.00025f;
+			particle.color = glm::vec4(rndDist(rndEngine)), rndDist(rndEngine), rndDist(rndEngine), 1.0f);
+		}
+
+		vk::DeviceSize bufferSize = sizeof(Particle) * PARTICLE_COUNT;
+
+		vk::Buffer stagingBuffer;
+		vk::DeviceMemory stagingBufferMemory;
+		createBuffer(bufferSize, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent, stagingBuffer, stagingBufferMemory);
+
+		void* data;
+		data = logicalDevice.mapMemory(stagingBufferMemory, 0, bufferSize, vk::MemoryMapFlags());
+		memcpy(data, particles.data(), (size_t)bufferSize);
+		logicalDevice.unmapMemory(stagingBufferMemory);
+
+		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+			createBuffer(bufferSize, vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal, shaderStorageBuffers[i], shaderStorageBuffersMemory[i]);
+			copyBuffer(stagingBuffer, shaderStorageBuffers[i], bufferSize);
 		}
 	}
 
