@@ -160,7 +160,7 @@ private:
 
 	// logical device
 	vk::Device logicalDevice;
-	vk::Queue graphicsQueue;
+	vk::Queue graphicsAndComputeQueue;
 	vk::Queue presentQueue;
 
 	// surface creation
@@ -174,13 +174,18 @@ private:
 	vk::Format swapChainImageFormat;
 	std::vector<vk::Framebuffer> swapChainFramebuffers;
 
-	// Pipeline
+	// graphics Pipeline
 	vk::RenderPass renderPass;
 	vk::DescriptorSetLayout descriptorSetLayout;
 	vk::PipelineLayout pipelineLayout;
 	vk::Pipeline graphicsPipeline;
 	vk::CommandPool commandPool;
 	std::vector<vk::CommandBuffer> commandBuffers;
+
+	// compute Pipeline
+	vk::DescriptorSetLayout computeDescriptorSetLayout;
+	vk::PipelineLayout computePipelineLayout;
+	vk::Pipeline computePipeline;
 
 	// Synchronization
 	std::vector<vk::Semaphore> imageAvailableSemaphores;
@@ -219,11 +224,12 @@ private:
 	
 	// physical dvice
 	struct QueueFamilyIndeces {
-		std::optional<uint32_t> graphicsFamily; // std optional is a wrapper that contains no value until ou assign something to it.
+		// std optional is a wrapper that contains no value until you assign something to it.
+		std::optional<uint32_t> graphicsAndComputeFamily;
 		std::optional<uint32_t> presentFamily;
 		// generic check inline
 		bool isComplete() {
-			return graphicsFamily.has_value() && presentFamily.has_value();
+			return graphicsAndComputeFamily.has_value() && presentFamily.has_value();
 		}
 	};
 	
@@ -296,6 +302,11 @@ private:
 
 		// 8. create Graphics Pipeline
 		createGraphicsPipeline();
+
+		createComputeDescriptorSetLayout();
+		
+		// 9. Create Compute Pipeline
+		createComputePipeline();
 		
 		// 9. Create Framebuffer
 		createFramebuffers();
@@ -580,9 +591,9 @@ private:
 			presentSupport = device.getSurfaceSupportKHR(i, surface);
 			
 			// Regarding graphics families
-			if (queueFamily.queueFlags & vk::QueueFlagBits::eGraphics)
+			if ((queueFamily.queueFlags & vk::QueueFlagBits::eGraphics) && (queueFamily.queueFlags & vk::QueueFlagBits::eCompute))
 			{					
-				indices.graphicsFamily = i;
+				indices.graphicsAndComputeFamily = i;
 			}
 			
 			 //Regarding surface families
@@ -607,7 +618,7 @@ private:
 		// Create struct for both presentation and family queue indices:
 
 		std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos;
-		std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsFamily.value(), indices.presentFamily.value() }; // ensure that each queue family index is stored only once.
+		std::set<uint32_t> uniqueQueueFamilies = { indices.graphicsAndComputeFamily.value(), indices.presentFamily.value() }; // ensure that each queue family index is stored only once.
 
 
 		float queuePriority = 1.0f;
@@ -666,7 +677,7 @@ private:
 		}
 
 		// If successful, retrieve queue
-		graphicsQueue = logicalDevice.getQueue(indices.graphicsFamily.value(), 0);
+		graphicsAndComputeQueue = logicalDevice.getQueue(indices.graphicsAndComputeFamily.value(), 0);
 		presentQueue = logicalDevice.getQueue(indices.presentFamily.value(), 0);
 	}
 
@@ -796,11 +807,11 @@ private:
 		}
 
 		QueueFamilyIndeces indices = findQueueFamilies(physicalDevice);
-		uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+		uint32_t queueFamilyIndices[] = { indices.graphicsAndComputeFamily.value(), indices.presentFamily.value() };
 
 		vk::SwapchainCreateInfoKHR createSwapChainInfo{};
 
-		if (indices.presentFamily != indices.graphicsFamily)
+		if (indices.presentFamily != indices.graphicsAndComputeFamily)
 		{
 			createSwapChainInfo.imageSharingMode = vk::SharingMode::eConcurrent;
 			createSwapChainInfo.queueFamilyIndexCount = 2;
@@ -938,6 +949,40 @@ private:
 
 	}
 
+	void createComputeDescriptorSetLayout() {
+		std::array<vk::DescriptorSetLayoutBinding, 3> layoutBindings{};
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+		layoutBindings[0].pImmutableSamplers = nullptr;
+		layoutBindings[0].stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorCount = 1;
+		layoutBindings[1].descriptorType = vk::DescriptorType::eStorageBuffer;
+		layoutBindings[1].pImmutableSamplers = nullptr;
+		layoutBindings[1].stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+		layoutBindings[2].binding = 2;
+		layoutBindings[2].descriptorCount = 1;
+		layoutBindings[2].descriptorType = vk::DescriptorType::eStorageBuffer;
+		layoutBindings[2].pImmutableSamplers = nullptr;
+		layoutBindings[2].stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+		vk::DescriptorSetLayoutCreateInfo layoutInfo{};
+		layoutInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
+		layoutInfo.bindingCount = 3;
+		layoutInfo.pBindings = layoutBindings.data();
+
+
+		try {
+			computeDescriptorSetLayout = logicalDevice.createDescriptorSetLayout(layoutInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create compute descriptor set layout! " + std::string(err.what()));
+		}
+	}
+
 	void createComputePipeline() {
 		auto computeShaderCode = readFile("Shaders/compute.spv");
 
@@ -949,7 +994,29 @@ private:
 		computeShaderStageInfo.module = computeShaderModule;
 		computeShaderStageInfo.pName = "main";
 
+		vk::PipelineLayoutCreateInfo pipelineLayoutInfo{};
+		pipelineLayoutInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = &computeDescriptorSetLayout;
 
+		// create layout
+		try {
+			computePipelineLayout = logicalDevice.createPipelineLayout(pipelineLayoutInfo);
+		}
+		catch (vk::SystemError& err) {
+			throw std::runtime_error("Failed to create compute pipeline layout" + std::string(err.what()));
+		}
+
+		vk::ComputePipelineCreateInfo pipelineInfo{};
+		pipelineInfo.sType = vk::StructureType::eComputePipelineCreateInfo;
+		pipelineInfo.layout = computePipelineLayout;
+		pipelineInfo.stage = computeShaderStageInfo;
+
+		vk::ResultValue<vk::Pipeline> result = logicalDevice.createComputePipeline(VK_NULL_HANDLE, pipelineInfo);
+		if (result.result != vk::Result::eSuccess) {
+			throw std::runtime_error("Failed to create the Graphics Pipeline!");
+		}
+		computePipeline = result.value;
 
 
 		logicalDevice.destroyShaderModule(computeShaderModule);
@@ -1210,7 +1277,7 @@ private:
 		vk::CommandPoolCreateInfo poolInfo{};
 		poolInfo.sType = vk::StructureType::eCommandPoolCreateInfo;
 		poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer; // allow command buffers to be rerecorded individually
-		poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+		poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsAndComputeFamily.value();
 
 		try {
 			commandPool = logicalDevice.createCommandPool(poolInfo);
@@ -1390,14 +1457,14 @@ private:
 		submitInfo.pCommandBuffers = &commandBuffer;
 
 		try {
-			graphicsQueue.submit(submitInfo, nullptr);
+			graphicsAndComputeQueue.submit(submitInfo, nullptr);
 		}
 		catch (vk::SystemError& err) {
 			throw std::runtime_error("Failed to submit to graphics queue!" + std::string(err.what()));
 		}
 
 		try {
-			graphicsQueue.waitIdle();
+			graphicsAndComputeQueue.waitIdle();
 		}
 		catch (vk::SystemError& err) {
 			throw std::runtime_error("Failed to wait on graphics queue!" + std::string(err.what()));
@@ -1953,7 +2020,7 @@ private:
 		submitInfo.pSignalSemaphores = signalSemaphores;
 		
 		try {
-			assert(graphicsQueue.submit(1, &submitInfo, inFlightFences[currentFrame]) == vk::Result::eSuccess);
+			assert(graphicsAndComputeQueue.submit(1, &submitInfo, inFlightFences[currentFrame]) == vk::Result::eSuccess);
 		}
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to submit draw command buffer!" + std::string(err.what()));
