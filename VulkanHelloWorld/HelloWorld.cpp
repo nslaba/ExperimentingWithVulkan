@@ -1790,7 +1790,7 @@ private:
 			float y = r * sin(theta);
 			particle.position = glm::vec2(x, y);
 			particle.velocity = glm::normalize(glm::vec2(x, y)) * 0.00025f;
-			particle.color = glm::vec4(rndDist(rndEngine)), rndDist(rndEngine), rndDist(rndEngine), 1.0f);
+			particle.color = glm::vec4(rndDist(rndEngine), rndDist(rndEngine), rndDist(rndEngine), 1.0f);
 		}
 
 		vk::DeviceSize bufferSize = sizeof(Particle) * PARTICLE_COUNT;
