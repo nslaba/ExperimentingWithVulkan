@@ -5,6 +5,7 @@ layout(binding = 0) uniform UniformBufferObject {
 	mat4 proj;
 	float time;
 	float aspectRatio;
+	float deltaTime;
 } ubo;
 
 layout(location = 0) in vec2 inPosition;

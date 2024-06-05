@@ -6,6 +6,7 @@ layout(binding = 0) uniform UniformBufferObject {
 	mat4 proj;
 	float time;
 	float aspectRatio;
+	float deltaTime;
 } ubo;
 layout(binding = 1) uniform sampler2D texSampler;
 layout(location = 0) in vec3 fragColor;

@@ -104,6 +104,7 @@ struct UniformBufferObject {
 	glm::mat4 proj;
 	float time;
 	float aspectRatio;
+	float deltaTime;
 };
 
 const uint32_t WIDTH = 800;
@@ -316,7 +317,6 @@ private:
 		// 8. create Graphics Pipeline
 		createGraphicsPipeline();
 
-		createComputeDescriptorSetLayout();
 		
 		// 9. Create Compute Pipeline
 		createComputePipeline();
@@ -934,27 +934,37 @@ private:
 
 	//8. Create Descriptor set layout
 	void createDescriptorSetLayout() {
-		vk::DescriptorSetLayoutBinding uboLayoutBinding{};
-		uboLayoutBinding.binding = 0;
-		uboLayoutBinding.descriptorType = vk::DescriptorType::eUniformBuffer;
-		uboLayoutBinding.descriptorCount = 1;
-		uboLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment;
-		uboLayoutBinding.pImmutableSamplers = nullptr;
 
-		vk::DescriptorSetLayoutBinding samplerLayoutBinding{};
-		samplerLayoutBinding.binding = 1;
-		samplerLayoutBinding.descriptorCount = 1;
-		samplerLayoutBinding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
-		samplerLayoutBinding.pImmutableSamplers = nullptr;
-		samplerLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eFragment;
+		std::array<vk::DescriptorSetLayoutBinding, 4> layoutBindings{};
+		layoutBindings[0].binding = 0;
+		layoutBindings[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+		layoutBindings[0].descriptorCount = 1;
+		layoutBindings[0].stageFlags = vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute;
+		layoutBindings[0].pImmutableSamplers = nullptr;
 
-		std::array<vk::DescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding };
-		
+		layoutBindings[1].binding = 1;
+		layoutBindings[1].descriptorCount = 1;
+		layoutBindings[1].descriptorType = vk::DescriptorType::eCombinedImageSampler;
+		layoutBindings[1].pImmutableSamplers = nullptr;
+		layoutBindings[1].stageFlags = vk::ShaderStageFlagBits::eFragment;
 
+		layoutBindings[2].binding = 2;
+		layoutBindings[2].descriptorCount = 1;
+		layoutBindings[2].descriptorType = vk::DescriptorType::eStorageBuffer;
+		layoutBindings[2].pImmutableSamplers = nullptr;
+		layoutBindings[2].stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+		layoutBindings[3].binding = 3;
+		layoutBindings[3].descriptorCount = 1;
+		layoutBindings[3].descriptorType = vk::DescriptorType::eStorageBuffer;
+		layoutBindings[3].pImmutableSamplers = nullptr;
+		layoutBindings[3].stageFlags = vk::ShaderStageFlagBits::eCompute;
+
+			
 		vk::DescriptorSetLayoutCreateInfo layoutInfo{};
 		layoutInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
-		layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
-		layoutInfo.pBindings = bindings.data();
+		layoutInfo.bindingCount = 4;
+		layoutInfo.pBindings = layoutBindings.data();
 
 		try {
 			descriptorSetLayout = logicalDevice.createDescriptorSetLayout(layoutInfo);
@@ -965,39 +975,7 @@ private:
 
 	}
 
-	void createComputeDescriptorSetLayout() {
-		std::array<vk::DescriptorSetLayoutBinding, 3> layoutBindings{};
-		layoutBindings[0].binding = 0;
-		layoutBindings[0].descriptorCount = 1;
-		layoutBindings[0].descriptorType = vk::DescriptorType::eUniformBuffer;
-		layoutBindings[0].pImmutableSamplers = nullptr;
-		layoutBindings[0].stageFlags = vk::ShaderStageFlagBits::eCompute;
 
-		layoutBindings[1].binding = 1;
-		layoutBindings[1].descriptorCount = 1;
-		layoutBindings[1].descriptorType = vk::DescriptorType::eStorageBuffer;
-		layoutBindings[1].pImmutableSamplers = nullptr;
-		layoutBindings[1].stageFlags = vk::ShaderStageFlagBits::eCompute;
-
-		layoutBindings[2].binding = 2;
-		layoutBindings[2].descriptorCount = 1;
-		layoutBindings[2].descriptorType = vk::DescriptorType::eStorageBuffer;
-		layoutBindings[2].pImmutableSamplers = nullptr;
-		layoutBindings[2].stageFlags = vk::ShaderStageFlagBits::eCompute;
-
-		vk::DescriptorSetLayoutCreateInfo layoutInfo{};
-		layoutInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
-		layoutInfo.bindingCount = 3;
-		layoutInfo.pBindings = layoutBindings.data();
-
-
-		try {
-			computeDescriptorSetLayout = logicalDevice.createDescriptorSetLayout(layoutInfo);
-		}
-		catch (vk::SystemError& err) {
-			throw std::runtime_error("Failed to create compute descriptor set layout! " + std::string(err.what()));
-		}
-	}
 
 	void createComputePipeline() {
 		auto computeShaderCode = readFile("Shaders/compute.spv");
@@ -1778,7 +1756,7 @@ private:
 		shaderStorageBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 		shaderStorageBuffersMemory.resize(MAX_FRAMES_IN_FLIGHT);
 
-		// create particles
+		// initialize particles
 		std::default_random_engine rndEngine((unsigned)time(nullptr));
 		std::uniform_real_distribution<float> rndDist(0.0f, 1.0f);
 
@@ -1793,6 +1771,7 @@ private:
 			particle.color = glm::vec4(rndDist(rndEngine), rndDist(rndEngine), rndDist(rndEngine), 1.0f);
 		}
 
+		// staging buffer in host mem to hold initial particle properties
 		vk::DeviceSize bufferSize = sizeof(Particle) * PARTICLE_COUNT;
 
 		vk::Buffer stagingBuffer;
@@ -1812,11 +1791,13 @@ private:
 
 	// 14. Create descriptor pools
 	void createDescriptorPool() {
-		std::array<vk::DescriptorPoolSize, 2> poolSizes{};
+		std::array<vk::DescriptorPoolSize, 3> poolSizes{};
 		poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
 		poolSizes[0].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
 		poolSizes[1].type = vk::DescriptorType::eCombinedImageSampler;
 		poolSizes[1].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+		poolSizes[2].type = vk::DescriptorType::eStorageBuffer;
+		poolSizes[2].descriptorCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT) * 2; //need two pairs since referencing last and current frame
 
 		vk::DescriptorPoolCreateInfo poolInfo{};
 		poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;
@@ -1862,7 +1843,7 @@ private:
 			imageInfo.imageView = textureImageView;
 			imageInfo.sampler = textureSampler;
 
-			std::array<vk::WriteDescriptorSet, 2> descriptorWrites{};
+			std::array<vk::WriteDescriptorSet, 4> descriptorWrites{};
 
 			
 			descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
@@ -1881,8 +1862,32 @@ private:
 			descriptorWrites[1].descriptorCount = 1;
 			descriptorWrites[1].pImageInfo = &imageInfo;
 			
-			//descriptorWrites[1].pImageInfo = nullptr;
-			//descriptorWrites[1].pTexelBufferView = nullptr;
+			//SSBo's
+			vk::DescriptorBufferInfo storageBufferInfoLastFrame{};
+			storageBufferInfoLastFrame.buffer = shaderStorageBuffers[(i - 1) % MAX_FRAMES_IN_FLIGHT];
+			storageBufferInfoLastFrame.offset = 0;
+			storageBufferInfoLastFrame.range = sizeof(Particle) * PARTICLE_COUNT;
+
+			descriptorWrites[2].sType = vk::StructureType::eWriteDescriptorSet;
+			descriptorWrites[2].dstSet = descriptorSets[i];
+			descriptorWrites[2].dstBinding = 2;
+			descriptorWrites[2].dstArrayElement = 0;
+			descriptorWrites[2].descriptorType = vk::DescriptorType::eStorageBuffer;
+			descriptorWrites[2].descriptorCount = 1;
+			descriptorWrites[2].pBufferInfo = &storageBufferInfoLastFrame;
+
+			vk::DescriptorBufferInfo storageBufferInfoCurrentFrame{};
+			storageBufferInfoLastFrame.buffer = shaderStorageBuffers[i];
+			storageBufferInfoLastFrame.offset = 0;
+			storageBufferInfoLastFrame.range = sizeof(Particle) * PARTICLE_COUNT;
+
+			descriptorWrites[3].sType = vk::StructureType::eWriteDescriptorSet;
+			descriptorWrites[3].dstSet = descriptorSets[i];
+			descriptorWrites[3].dstBinding = 3;
+			descriptorWrites[3].dstArrayElement = 0;
+			descriptorWrites[3].descriptorType = vk::DescriptorType::eStorageBuffer;
+			descriptorWrites[3].descriptorCount = 1;
+			descriptorWrites[3].pBufferInfo = &storageBufferInfoCurrentFrame;
 
 			try {
 				logicalDevice.updateDescriptorSets(descriptorWrites, {});
@@ -2123,9 +2128,12 @@ private:
 	// Will generate a new transformation every frame to make the geometry spin around
 	void updateUniformBuffer(uint32_t currentImage) {
 		static auto startTime = std::chrono::high_resolution_clock::now();
+		static auto previousTime = startTime;
 
 		auto currentTime = std::chrono::high_resolution_clock::now();
 		float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+		float deltaTime = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - previousTime).count();
+
 		float aspectRatio = swapChainExtent.width / (float)swapChainExtent.height;
 
 		// UBO nescesities for rotation
@@ -2136,6 +2144,9 @@ private:
 		ubo.proj[1][1] *= -1; //if I don't do this image rendered upside down since GLM originally designed for openGL where Y coordinate in clip coord is inverted
 		ubo.time = time;
 		ubo.aspectRatio = aspectRatio;
+		ubo.deltaTime = deltaTime;
+
+		previousTime = currentTime;
 
 		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
 
