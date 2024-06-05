@@ -40,7 +40,7 @@
 
 #include <random>
 
-const int PARTICLE_COUNT = 1000;
+const int PARTICLE_COUNT = 4096;
 struct Particle {
 	glm::vec2 position;
 	glm::vec2 velocity;
@@ -195,6 +195,7 @@ private:
 	vk::DescriptorSetLayout computeDescriptorSetLayout;
 	vk::PipelineLayout computePipelineLayout;
 	vk::Pipeline computePipeline;
+	std::vector<vk::CommandBuffer> computeCommandBuffers;
 
 	// Synchronization
 	std::vector<vk::Semaphore> imageAvailableSemaphores;
@@ -1901,6 +1902,7 @@ private:
 	// 13. Create Command Buffer
 	void createCommandBuffers() {
 		commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+		computeCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 
 		vk::CommandBufferAllocateInfo allocInfo{};
 		allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
@@ -1914,6 +1916,23 @@ private:
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to create a command buffers!" + std::string(err.what()));
 		}
+
+		try {
+			computeCommandBuffers = logicalDevice.allocateCommandBuffers(allocInfo);
+		}
+		catch (const vk::SystemError& err) {
+			throw std::runtime_error("Failed to allocate compute command buffers!" + std::string(err.what()));
+		}
+		
+	}
+
+	void recordComputeCommandBuffer(vk::CommandBuffer commandBuffer) {
+
+		// compute work first for now
+
+		commandBuffer.bindPipeline(vk::PipelineBindPoint::eCompute, computePipeline);
+		commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute, computePipelineLayout, 0, 1, &descriptorSets[currentFrame], 0, nullptr);
+		//commandBuffer.
 	}
 
 	void recordCommandBuffer(vk::CommandBuffer commandBuffer, uint32_t imageIndex) {
@@ -1929,6 +1948,8 @@ private:
 		catch (const vk::SystemError& err) {
 			throw std::runtime_error("Failed to begin recording command buffer" + std::string(err.what()));
 		}
+
+		
 
 		// render pass
 		vk::RenderPassBeginInfo renderPassInfo{};
